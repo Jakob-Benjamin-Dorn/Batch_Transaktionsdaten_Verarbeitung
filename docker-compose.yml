@@ -1,0 +1,41 @@
+services:
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: batch-transactions-airflow
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      AIRFLOW__CORE__EXECUTOR: "SequentialExecutor"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "sqlite:////opt/airflow/state/airflow.db"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "local-dev-secret"
+      PYTHONPATH: "/opt/airflow"
+
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - ./knowledge_base:/opt/airflow/knowledge_base
+      - ./data:/opt/airflow/data
+      - airflow_state:/opt/airflow/state
+
+    command: >
+      bash -c "
+      airflow db migrate &&
+      airflow users create
+        --username admin
+        --password admin
+        --firstname Admin
+        --lastname User
+        --role Admin
+        --email admin@example.com || true &&
+      airflow webserver &
+      exec airflow scheduler
+      "
+
+volumes:
+  airflow_state:

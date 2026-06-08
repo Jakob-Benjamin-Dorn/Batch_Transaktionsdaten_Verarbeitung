@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtuelle Umgebungen
+.venv/
+venv/
+env/
+
+# Umgebungsvariablen und Secrets
+.env
+.env.*
+!.env.example
+
+# IDEs
+.vscode/
+.idea/
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Airflow
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+logs/
+
+# Lokale Spark-Artefakte
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Generierte Daten nicht ins Repository einchecken
+data/**
+
+# Ordnerstruktur trotzdem behalten
+!data/**/
+!data/**/.gitkeep
+
+# Generierte Reports
+*.log
