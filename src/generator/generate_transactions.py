@@ -450,12 +450,18 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
     idx = dirty.sample(frac=cfg.missing_customer_rate, random_state=cfg.seed + 1).index
     dirty.loc[idx, "customer_id"] = None
 
-    # 3. Ungültige Währungen
+    # 3. Ungültige Währung
     idx = dirty.sample(frac=cfg.invalid_currency_rate, random_state=cfg.seed + 2).index
     dirty.loc[idx, "currency"] = random.choice(["EURO", "US", "XXX", "", None])
 
     # 4. Kaputte Zeitstempel als Strings
     idx = dirty.sample(frac=cfg.bad_timestamp_rate, random_state=cfg.seed + 3).index
+
+    # Bronze speichert Zeitwerte als rohe Strings, damit auch
+    # absichtlich ungültige Werte erhalten bleiben können.
+    dirty["event_time"] = dirty["event_time"].map(
+        lambda value: value.isoformat() if pd.notna(value) else None
+    )
     dirty.loc[idx, "event_time"] = "not-a-timestamp"
 
     # 5. Negative Beträge ohne Refund-Flag
@@ -469,7 +475,7 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
 
     # 6. Future timestamps
     idx = dirty.sample(frac=0.003, random_state=cfg.seed + 5).index
-    dirty.loc[idx, "event_time"] = datetime.fromisoformat("2035-01-01")
+    dirty.loc[idx, "event_time"] = "2035-01-01T00:00:00"
 
     # 7. Whitespace / uneinheitliche Source-Systeme
     idx = dirty.sample(frac=0.01, random_state=cfg.seed + 6).index

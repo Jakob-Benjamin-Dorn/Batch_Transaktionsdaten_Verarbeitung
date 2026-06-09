@@ -37,12 +37,5 @@ spark-warehouse/
 metastore_db/
 derby.log
 
-# Generierte Daten nicht ins Repository einchecken
-data/**
-
-# Ordnerstruktur trotzdem behalten
-!data/**/
-!data/**/.gitkeep
-
 # Generierte Reports
 *.log

@@ -1,0 +1,197 @@
+{
+  "contract_name": "transaction_bronze_contract",
+  "contract_version": "1.0.0",
+  "description": "Expected structure and quality rules for daily transaction batches.",
+  "primary_key": [
+    "transaction_id"
+  ],
+  "fields": [
+    {
+      "name": "transaction_id",
+      "target_type": "string",
+      "nullable": false,
+      "description": "Unique identifier of the transaction."
+    },
+    {
+      "name": "customer_id",
+      "target_type": "string",
+      "nullable": false,
+      "description": "Identifier of the customer."
+    },
+    {
+      "name": "merchant_id",
+      "target_type": "string",
+      "nullable": false,
+      "description": "Identifier of the merchant."
+    },
+    {
+      "name": "device_id",
+      "target_type": "string",
+      "nullable": false,
+      "description": "Identifier of the device used for the transaction."
+    },
+    {
+      "name": "event_time",
+      "target_type": "timestamp",
+      "nullable": false,
+      "description": "Time at which the transaction occurred."
+    },
+    {
+      "name": "ingestion_time",
+      "target_type": "timestamp",
+      "nullable": false,
+      "description": "Time at which the transaction entered the source system."
+    },
+    {
+      "name": "amount",
+      "target_type": "double",
+      "nullable": false,
+      "description": "Transaction amount in the original currency."
+    },
+    {
+      "name": "currency",
+      "target_type": "string",
+      "nullable": false,
+      "allowed_values": [
+        "EUR",
+        "USD",
+        "GBP",
+        "PLN"
+      ],
+      "description": "ISO currency code of the transaction."
+    },
+    {
+      "name": "transaction_country",
+      "target_type": "string",
+      "nullable": false,
+      "description": "Country in which the transaction occurred."
+    },
+    {
+      "name": "transaction_city",
+      "target_type": "string",
+      "nullable": false,
+      "description": "City in which the transaction occurred."
+    },
+    {
+      "name": "payment_method",
+      "target_type": "string",
+      "nullable": false,
+      "allowed_values": [
+        "card",
+        "paypal",
+        "bank_transfer",
+        "apple_pay",
+        "google_pay"
+      ],
+      "description": "Payment method used for the transaction."
+    },
+    {
+      "name": "transaction_type",
+      "target_type": "string",
+      "nullable": false,
+      "allowed_values": [
+        "purchase",
+        "refund"
+      ],
+      "description": "Business type of the transaction."
+    },
+    {
+      "name": "status",
+      "target_type": "string",
+      "nullable": false,
+      "allowed_values": [
+        "approved",
+        "declined",
+        "pending"
+      ],
+      "description": "Processing status of the transaction."
+    },
+    {
+      "name": "is_refund",
+      "target_type": "boolean",
+      "nullable": false,
+      "description": "Indicates whether the transaction represents a refund."
+    },
+    {
+      "name": "is_fraud",
+      "target_type": "boolean",
+      "nullable": false,
+      "description": "Synthetic fraud label."
+    },
+    {
+      "name": "is_late_arriving",
+      "target_type": "boolean",
+      "nullable": false,
+      "description": "Indicates whether the event arrived late."
+    },
+    {
+      "name": "source_system",
+      "target_type": "string",
+      "nullable": false,
+      "allowed_values": [
+        "payment_gateway_v1",
+        "payment_gateway_v2",
+        "mobile_app",
+        "web_checkout"
+      ],
+      "description": "System that delivered the transaction."
+    },
+    {
+      "name": "device_trust_score",
+      "target_type": "double",
+      "nullable": true,
+      "optional": true,
+      "description": "Optional trust score introduced by schema drift from 2026-01-20 onward."
+    }
+  ],
+  "quality_rules": [
+    {
+      "rule_id": "DQ001",
+      "name": "required_customer_id",
+      "description": "customer_id must not be null or empty.",
+      "severity": "high"
+    },
+    {
+      "rule_id": "DQ002",
+      "name": "valid_currency",
+      "description": "currency must contain an allowed ISO currency code.",
+      "severity": "medium"
+    },
+    {
+      "rule_id": "DQ003",
+      "name": "valid_event_time",
+      "description": "event_time must be convertible to a timestamp.",
+      "severity": "high"
+    },
+    {
+      "rule_id": "DQ004",
+      "name": "event_time_not_in_future",
+      "description": "event_time must not be later than the batch processing date.",
+      "severity": "high"
+    },
+    {
+      "rule_id": "DQ005",
+      "name": "valid_purchase_amount",
+      "description": "purchase transactions must have an amount greater than zero.",
+      "severity": "high"
+    },
+    {
+      "rule_id": "DQ006",
+      "name": "valid_refund_amount",
+      "description": "refund transactions must have an amount below zero and is_refund must be true.",
+      "severity": "high"
+    },
+    {
+      "rule_id": "DQ007",
+      "name": "unique_transaction_id",
+      "description": "Only the newest record for each transaction_id may remain in Silver.",
+      "severity": "medium"
+    },
+    {
+      "rule_id": "DQ008",
+      "name": "valid_source_system",
+      "description": "source_system must match an allowed normalized value.",
+      "severity": "low"
+    }
+  ]
+}
