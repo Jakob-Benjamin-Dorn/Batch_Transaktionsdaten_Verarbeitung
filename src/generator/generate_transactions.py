@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import random
-#import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -34,8 +33,6 @@ class Config:
     bad_timestamp_rate: float = 0.01
     negative_amount_error_rate: float = 0.005
     late_arrival_rate: float = 0.04
-
-    schema_drift_day: int = 20
 
 
 COUNTRIES = {
@@ -431,6 +428,9 @@ def generate_chargebacks(transactions: pd.DataFrame) -> pd.DataFrame:
 
 def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.DataFrame:
     dirty = transactions.copy()
+    # Bronze-Rohdaten dürfen gemischte Datentypen enthalten.
+    # Dadurch können wir absichtlich beschädigte Zeitstempel injizieren.
+    dirty["event_time"] = dirty["event_time"].astype("object")
 
     n = len(dirty)
 
@@ -476,43 +476,6 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
     dirty.loc[idx, "source_system"] = dirty.loc[idx, "source_system"].astype(str).str.upper() + " "
 
     return dirty.sample(frac=1.0, random_state=cfg.seed).reset_index(drop=True)
-
-
-# -----------------------------
-# Speichern
-# -----------------------------
-
-def save_outputs(
-    cfg: Config,
-    customers: pd.DataFrame,
-    merchants: pd.DataFrame,
-    devices: pd.DataFrame,
-    exchange_rates: pd.DataFrame,
-    transactions_clean: pd.DataFrame,
-    transactions_dirty: pd.DataFrame,
-    chargebacks: pd.DataFrame,
-) -> None:
-    output_dir = Path(cfg.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    customers.to_csv(output_dir / "customers.csv", index=False)
-    merchants.to_csv(output_dir / "merchants.csv", index=False)
-    devices.to_csv(output_dir / "devices.csv", index=False)
-    exchange_rates.to_csv(output_dir / "exchange_rates.csv", index=False)
-    transactions_clean.to_csv(output_dir / "transactions_clean.csv", index=False)
-    transactions_dirty.to_csv(output_dir / "transactions_dirty.csv", index=False)
-    chargebacks.to_csv(output_dir / "chargebacks.csv", index=False)
-
-    print(f"Saved data to: {output_dir.resolve()}")
-    print()
-    print("Rows generated:")
-    print(f"customers:           {len(customers):,}")
-    print(f"merchants:           {len(merchants):,}")
-    print(f"devices:             {len(devices):,}")
-    print(f"exchange_rates:      {len(exchange_rates):,}")
-    print(f"transactions_clean:  {len(transactions_clean):,}")
-    print(f"transactions_dirty:  {len(transactions_dirty):,}")
-    print(f"chargebacks:         {len(chargebacks):,}")
 
 
 def parse_args() -> argparse.Namespace:

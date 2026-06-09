@@ -1,6 +1,4 @@
-FROM apache/airflow:2.10.4-python3.11
-
-ARG AIRFLOW_VERSION=2.10.4
+FROM apache/airflow:3.1.8-python3.12
 
 USER root
 
@@ -20,5 +18,6 @@ COPY requirements.txt /opt/airflow/requirements.txt
 USER airflow
 
 RUN pip install --no-cache-dir \
-    "apache-airflow==${AIRFLOW_VERSION}" \
     -r /opt/airflow/requirements.txt
+
+WORKDIR /opt/airflow
