@@ -77,6 +77,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./src:/opt/airflow/src:ro
       - ./knowledge_base:/opt/airflow/knowledge_base:ro
+      - ./tests:/opt/airflow/tests:ro
 
       - airflow_data:/opt/airflow/data
       - airflow_state:/opt/airflow/state
