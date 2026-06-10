@@ -214,6 +214,65 @@ class TestSparkTransformation(unittest.TestCase):
             2,
         )
 
+    def test_invalid_ingestion_time_goes_to_quarantine(self):
+        rows = [
+            (
+                "txn_invalid_ingestion_time",
+                "cus_1",
+                "mer_1",
+                "dev_1",
+                "2026-01-01T10:00:00",
+                "not-a-timestamp",
+                25.0,
+                "EUR",
+                "DE",
+                "Berlin",
+                "card",
+                "purchase",
+                "approved",
+                False,
+                False,
+                False,
+                "mobile_app",
+                None,
+            )
+        ]
+
+        bronze = self.spark.createDataFrame(
+            rows,
+            schema=TRANSACTION_BRONZE_SCHEMA,
+        )
+
+        prepared = prepare_transactions(
+            transactions=bronze,
+            logical_date="2026-01-01",
+        )
+
+        prepared = mark_duplicate_transactions(prepared)
+
+        silver, quarantine = split_by_quality(prepared)
+
+        self.assertEqual(
+            silver.count(),
+            0,
+        )
+
+        self.assertEqual(
+            quarantine.count(),
+            1,
+        )
+
+        quarantined_row = quarantine.first()
+
+        self.assertIn(
+            "DQ010_INVALID_INGESTION_TIME",
+            quarantined_row["dq_errors"],
+        )
+
+        self.assertFalse(
+            quarantined_row["is_valid"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

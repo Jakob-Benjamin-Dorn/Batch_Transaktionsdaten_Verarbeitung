@@ -3,9 +3,14 @@ from __future__ import annotations
 import unittest
 
 from pyspark.sql import SparkSession
+from pyspark.sql.types import StringType, StructField, StructType
 
 from src.spark.transform_transactions import prepare_transactions
-from src.spark.data_quality import mark_duplicate_transactions
+from src.spark.data_quality import (
+    invalid_ingestion_time,
+    mark_duplicate_transactions,
+    missing_transaction_id,
+)
 from src.spark.schemas import TRANSACTION_BRONZE_SCHEMA
 
 
@@ -216,6 +221,122 @@ class TestDataQualityRules(unittest.TestCase):
             "DQ007_DUPLICATE_TRANSACTION",
             rows[1]["dq_errors"],
         )
+
+    def test_missing_transaction_id_detects_null(self):
+        schema = StructType(
+            [
+                StructField(
+                    "transaction_id",
+                    StringType(),
+                    True,
+                ),
+            ]
+        )
+
+        dataframe = self.spark.createDataFrame(
+            [
+                {
+                    "transaction_id": None,
+                }
+            ],
+            schema=schema,
+        )
+
+        result = dataframe.select(
+            missing_transaction_id().alias("is_invalid")
+        ).collect()[0]["is_invalid"]
+
+        self.assertTrue(result)
+
+    def test_missing_transaction_id_detects_empty_string(self):
+        schema = StructType(
+            [
+                StructField(
+                    "transaction_id",
+                    StringType(),
+                    True,
+                ),
+            ]
+        )
+
+        dataframe = self.spark.createDataFrame(
+            [
+                {
+                    "transaction_id": "   ",
+                }
+            ],
+            schema=schema,
+        )
+
+        result = dataframe.select(
+            missing_transaction_id().alias("is_invalid")
+        ).collect()[0]["is_invalid"]
+
+        self.assertTrue(result)
+
+    def test_invalid_ingestion_time_detects_null_raw_value(self):
+        schema = StructType(
+            [
+                StructField(
+                    "ingestion_time",
+                    StringType(),
+                    True,
+                ),
+                StructField(
+                    "ingestion_time_parsed",
+                    StringType(),
+                    True,
+                ),
+            ]
+        )
+
+        dataframe = self.spark.createDataFrame(
+            [
+                {
+                    "ingestion_time": None,
+                    "ingestion_time_parsed": None,
+                }
+            ],
+            schema=schema,
+        )
+
+        result = dataframe.select(
+            invalid_ingestion_time().alias("is_invalid")
+        ).collect()[0]["is_invalid"]
+
+        self.assertTrue(result)
+
+    def test_invalid_ingestion_time_detects_parse_failure(self):
+        schema = StructType(
+            [
+                StructField(
+                    "ingestion_time",
+                    StringType(),
+                    True,
+                ),
+                StructField(
+                    "ingestion_time_parsed",
+                    StringType(),
+                    True,
+                ),
+            ]
+        )
+
+        dataframe = self.spark.createDataFrame(
+            [
+                {
+                    "ingestion_time": "not-a-timestamp",
+                    "ingestion_time_parsed": None,
+                }
+            ],
+            schema=schema,
+        )
+
+        result = dataframe.select(
+            invalid_ingestion_time().alias("is_invalid")
+        ).collect()[0]["is_invalid"]
+
+        self.assertTrue(result)
 
 
 if __name__ == "__main__":

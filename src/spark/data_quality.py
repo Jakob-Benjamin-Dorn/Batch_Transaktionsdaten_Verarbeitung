@@ -9,6 +9,7 @@ from pyspark.sql.functions import (
     row_number,
     size,
     to_date,
+    trim,
     when,
 )
 
@@ -124,4 +125,20 @@ def invalid_source_system() -> Column:
         | ~col("source_system_normalized").isin(
             ALLOWED_SOURCE_SYSTEMS
         )
+    )
+
+
+def missing_transaction_id() -> Column:
+    """DQ009: transaction_id must not be null or empty."""
+    return (
+        col("transaction_id").isNull()
+        | (trim(col("transaction_id")) == "")
+    )
+
+
+def invalid_ingestion_time() -> Column:
+    """DQ010: ingestion_time must be present and parseable as a timestamp."""
+    return (
+        col("ingestion_time").isNull()
+        | col("ingestion_time_parsed").isNull()
     )
