@@ -49,7 +49,6 @@ services:
   airflow:
     <<: *airflow-common
 
-    container_name: batch-transactions-airflow
     user: "50000:0"
 
     depends_on:

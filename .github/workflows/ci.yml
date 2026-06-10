@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Airflow image
+        run: docker compose build
+
+      - name: Check direct dependencies
+        run: |
+          docker compose run --rm \
+            --entrypoint python \
+            airflow \
+            -c '
+          import jinja2
+          import numpy
+          import openai
+          import pandas
+          import pydantic
+          import pyspark
+
+          print("All direct dependencies imported successfully.")
+          '
+
+      - name: Run automated tests
+        run: |
+          docker compose run --rm \
+            --entrypoint python \
+            airflow \
+            -m unittest discover \
+            -s /opt/airflow/tests \
+            -p "test_*.py" \
+            -v
+
+      - name: Show Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Clean up
+        if: always()
+        run: docker compose down -v --remove-orphans
