@@ -309,6 +309,14 @@ docker compose down -v
 
 Implementiert:
 
+* zwei getrennte Airflow-DAGs
+* täglicher Core-DAG
+* deterministisches Quality Gate
+* task-spezifische Retries
+* separater KI-Reporting-DAG
+* automatische Übergabe des Batch-Datums
+* strukturierter DeepSeek-Report
+* deterministisches Markdown-Rendering
 * Docker-Laufzeitumgebung
 * täglicher synthetischer Datengenerator
 * partitionierter Bronze-Layer
@@ -321,7 +329,243 @@ Implementiert:
 
 Geplant:
 
-* KI-gestützte Zusammenfassung mit strukturiertem JSON-Output
-* deterministisches Markdown-Rendering
-* vollständige Airflow-Orchestrierung
-* Quality Gate für kritische Pipeline-Fehler
+- optionaler Vergleich mehrerer KI-Provider
+- PostgreSQL statt SQLite für ein produktionsnäheres Airflow-Setup
+- CI-Pipeline für automatisierte Tests
+- optionale Alerting- und Monitoring-Erweiterungen
+
+## Airflow-Orchestrierung
+
+Die Pipeline wird durch zwei getrennte Airflow-DAGs orchestriert.
+
+### Core-DAG
+
+```text
+batch_transaction_pipeline
+```
+
+Der Core-DAG enthält ausschließlich die deterministischen Verarbeitungsschritte:
+
+```text
+generate_bronze
+        ↓
+transform_to_silver
+        ↓
+evaluate_quality_gate
+        ↓
+build_gold
+        ↓
+prepare_ai_payload
+        ↓
+trigger_ai_reporting_pipeline
+```
+
+Der DAG erzeugt:
+
+* den partitionierten Bronze-Batch,
+* bereinigte und deduplizierte Silver-Daten,
+* Quarantine-Daten mit Data-Quality-Fehlern,
+* den technischen Quality Report,
+* die Gold-Aggregationen,
+* das datenschutzgeprüfte AI-Payload.
+
+Der Core-DAG ist nicht vom Erfolg der externen KI-API abhängig. Nachdem der KI-DAG erfolgreich ausgelöst wurde, kann der Core-DAG als erfolgreich abgeschlossen werden.
+
+### KI-Reporting-DAG
+
+```text
+ai_reporting_pipeline
+```
+
+Der separate KI-DAG wird vom Core-DAG ausgelöst und besteht aus:
+
+```text
+create_ai_summary
+        ↓
+render_markdown
+```
+
+Der erste Task sendet ausschließlich aggregierte und freigegebene Kennzahlen an die DeepSeek-API. Die strukturierte Antwort wird lokal mit Pydantic validiert.
+
+Der zweite Task erzeugt anschließend deterministisch einen Markdown-Bericht aus dem validierten JSON.
+
+Ein Ausfall der externen API betrifft damit nur den KI-Reporting-DAG. Die zuvor erzeugten Bronze-, Silver-, Quarantine- und Gold-Daten bleiben erhalten, und der Core-DAG kann weiterhin erfolgreich sein.
+
+## Retry-Verhalten
+
+Retries werden nur für Schritte verwendet, bei denen ein erneuter Versuch sinnvoll sein kann.
+
+| Task                            | Retries | Begründung                                   |
+| ------------------------------- | ------: | -------------------------------------------- |
+| `generate_bronze`               |       1 | Temporärer Dateisystemfehler möglich         |
+| `transform_to_silver`           |       1 | Temporäre Spark- oder JVM-Probleme möglich   |
+| `evaluate_quality_gate`         |       0 | Deterministische Entscheidung                |
+| `build_gold`                    |       1 | Temporäre Spark-Probleme möglich             |
+| `prepare_ai_payload`            |       0 | Deterministische lokale Verarbeitung         |
+| `trigger_ai_reporting_pipeline` |       0 | Reiner Orchestrierungsschritt                |
+| `create_ai_summary`             |       3 | Externe API, Netzwerkfehler oder Rate Limits |
+| `render_markdown`               |       0 | Deterministisches lokales Rendering          |
+
+Der DeepSeek-Task verwendet einen exponentiellen Retry-Abstand. Ein vorübergehender API-Ausfall führt deshalb zunächst zu einem erneuten Versuch und nicht unmittelbar zu einem endgültigen Fehler.
+
+## Quality Gate
+
+Nach der Spark-Transformation wird der technische Quality Report gegen konfigurierbare Schwellenwerte aus dem Data Contract geprüft.
+
+Aktuelle Beispielkonfiguration:
+
+```json
+{
+  "quality_gate": {
+    "minimum_validity_rate": 0.85,
+    "maximum_high_severity_failure_rate": 0.1
+  }
+}
+```
+
+Der Core-DAG wird gestoppt, wenn:
+
+* der Batch keine Eingabezeilen enthält,
+* die Validitätsrate unter 85 Prozent fällt,
+* eine einzelne High-Severity-Regel mehr als 10 Prozent der Eingabezeilen betrifft.
+
+Die Schwellenwerte dienen als nachvollziehbare Beispielwerte für dieses Portfolio-Projekt und stellen keine allgemeinen Branchenstandards dar.
+
+## DAGs aktivieren
+
+Beide DAGs können über die Airflow-Oberfläche aktiviert werden:
+
+```text
+http://localhost:8080
+```
+
+Alternativ über die Kommandozeile:
+
+```bash
+docker compose exec airflow \
+  airflow dags unpause batch_transaction_pipeline
+```
+
+```bash
+docker compose exec airflow \
+  airflow dags unpause ai_reporting_pipeline
+```
+
+## Core-DAG manuell starten
+
+```bash
+docker compose exec airflow \
+  airflow dags trigger \
+  --logical-date 2026-01-02T00:00:00+00:00 \
+  batch_transaction_pipeline
+```
+
+Die logische Zeit beschreibt das zu verarbeitende Datenintervall und nicht zwingend den tatsächlichen Startzeitpunkt des Runs.
+
+## DAG-Runs kontrollieren
+
+Core-DAG:
+
+```bash
+docker compose exec airflow \
+  airflow dags list-runs \
+  batch_transaction_pipeline
+```
+
+KI-Reporting-DAG:
+
+```bash
+docker compose exec airflow \
+  airflow dags list-runs \
+  ai_reporting_pipeline
+```
+
+In der verwendeten Airflow-Version wird die DAG-ID bei `list-runs` als Positionsargument angegeben.
+
+## Task-Zustände eines Runs anzeigen
+
+```bash
+docker compose exec airflow \
+  airflow tasks states-for-dag-run \
+  ai_reporting_pipeline \
+  "<RUN_ID>"
+```
+
+Die Run-ID kann zuvor aus `airflow dags list-runs` übernommen werden.
+
+## DAG-Importfehler prüfen
+
+```bash
+docker compose exec airflow \
+  airflow dags list-import-errors
+```
+
+## Historischen Core-DAG testen
+
+```bash
+docker compose exec airflow \
+  airflow dags test \
+  batch_transaction_pipeline \
+  2026-01-01
+```
+
+Dieser Test führt die Core-Verarbeitung für den angegebenen logischen Tag aus und löst anschließend den KI-Reporting-DAG aus.
+
+## Ergebnisdateien
+
+Für einen vollständig erfolgreichen Lauf entstehen im Reports-Verzeichnis:
+
+```text
+/opt/airflow/data/reports/year=2026/month=01/day=01/
+├── quality_report.json
+├── business_metrics.json
+├── ai_input_payload.json
+├── ai_summary.json
+└── ai_summary.md
+```
+
+Dateien anzeigen:
+
+```bash
+docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+find \
+  /opt/airflow/data/reports/year=2026/month=01/day=01 \
+  -maxdepth 1 \
+  -type f \
+  -printf "%f\n" \
+  | sort
+'
+```
+
+Markdown-Bericht anzeigen:
+
+```bash
+docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+sed -n "1,220p" \
+  /opt/airflow/data/reports/year=2026/month=01/day=01/ai_summary.md
+'
+```
+
+## Fehlerverhalten
+
+Das Projekt unterscheidet bewusst zwischen Datenverarbeitung und externer KI-Berichterstellung.
+
+```text
+Spark- oder Quality-Gate-Fehler
+→ Core-DAG schlägt fehl
+
+DeepSeek-API vorübergehend nicht erreichbar
+→ KI-Task wird erneut versucht
+
+DeepSeek-API dauerhaft nicht erreichbar
+→ KI-DAG schlägt fehl
+→ Core-DAG und Datenprodukte bleiben erfolgreich erhalten
+```
+
+Diese Trennung verhindert, dass eine nicht verfügbare externe API die eigentliche Datenpipeline als fehlgeschlagen erscheinen lässt.
