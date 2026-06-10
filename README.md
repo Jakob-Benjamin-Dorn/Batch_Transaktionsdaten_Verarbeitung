@@ -1,16 +1,69 @@
-# Batch-Transaktionsdaten-Verarbeitung 
+# Batch-Transaktionsdaten-Verarbeitung
 
+Dieses Portfolio-Projekt simuliert eine tägliche Batch-Datenpipeline für synthetische Finanztransaktionen.
 
-### Startanleitung: 
+Die Pipeline:
 
-Benötigt werden Docker, Docker Compose und Git. Das Repository kann geklont werden mit:
+1. erzeugt reproduzierbare tägliche Rohdaten,
+2. validiert und bereinigt sie mit Apache Spark,
+3. trennt gültige und fehlerhafte Datensätze,
+4. erstellt aggregierte Business-Kennzahlen,
+5. erzeugt später aus ausschließlich aggregierten Daten eine KI-gestützte Zusammenfassung,
+6. wird mit Apache Airflow orchestriert.
+
+## Architektur
+
+```text
+Synthetic Data Generator
+        ↓
+Bronze: rohe JSONL-Transaktionen
+        ↓
+Spark Data Quality und Deduplizierung
+        ├── Silver: gültige, typisierte Parquet-Daten
+        └── Quarantine: ungültige Zeilen mit DQ-Regeln
+        ↓
+Gold: aggregierte Business-Kennzahlen
+        ↓
+KI-Zusammenfassung aus freigegebenen Metriken
+```
+
+Die Laufzeitumgebung wird vollständig mit Docker bereitgestellt. Eine lokale Python-, Java-, Spark- oder Airflow-Installation ist nicht notwendig.
+
+## Docker-Konzept
+
+Der Quellcode wird read-only in die Container eingebunden. Veränderliche Laufzeitdaten werden in Docker Named Volumes gespeichert.
+
+```text
+Bind-Mounts, read-only:
+- src/
+- tests/
+- airflow/dags/
+- knowledge_base/
+
+Named Volumes:
+- Bronze-, Silver-, Quarantine- und Gold-Daten
+- Airflow-Datenbank
+- Airflow-Logs
+```
+
+Ein Initialisierungs-Service richtet die benötigten Volumes und Berechtigungen ein. Dadurch ist keine Anpassung an eine Linux-Host-UID erforderlich.
+
+## Voraussetzungen
+
+* Git
+* Docker
+* Docker Compose
+
+## Repository klonen
 
 ```bash
 git clone https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung.git
 cd Batch_Transaktionsdaten_Verarbeitung
 ```
 
-Beim ersten Start muss das Docker-Image gebaut und die Services gestartet werden:
+## Services starten
+
+Beim ersten Start oder nach Änderungen an `Dockerfile` beziehungsweise `requirements.txt`:
 
 ```bash
 docker compose up --build -d
@@ -22,9 +75,7 @@ Bei späteren Starts:
 docker compose up -d
 ```
 
-Der Initialisierungs-Service richtet automatisch die benötigten Docker Volumes und deren Berechtigungen ein.
-
-### Status prüfen
+Status prüfen:
 
 ```bash
 docker compose ps
@@ -42,7 +93,7 @@ Airflow ist anschließend erreichbar unter:
 http://localhost:8080
 ```
 
-### Täglichen Generator-Batch ausführen
+## 1. Täglichen Bronze-Batch erzeugen
 
 Beispiel für den 1. Januar 2026:
 
@@ -55,7 +106,7 @@ docker compose run --rm \
   --output-dir /opt/airflow/data
 ```
 
-Die erzeugten Daten werden im Docker Named Volume `airflow_data` gespeichert und nach Datum partitioniert:
+Die Rohdaten werden als partitionierte JSONL-Datei gespeichert:
 
 ```text
 /opt/airflow/data/bronze_raw/transactions/
@@ -65,39 +116,20 @@ Die erzeugten Daten werden im Docker Named Volume `airflow_data` gespeichert und
             └── transactions.jsonl
 ```
 
-### Erzeugte Batches anzeigen
+Der Generator erzeugt bewusst unter anderem:
 
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-  find /opt/airflow/data/bronze_raw/transactions \
-    -type f \
-    -name "*.jsonl" \
-    | sort
-  '
-```
+* Duplikate,
+* fehlende Kunden-IDs,
+* ungültige Währungen,
+* beschädigte und zukünftige Zeitstempel,
+* fehlerhafte Purchase- und Refund-Beträge,
+* verspätet eintreffende Events,
+* simulierte Schema Drift.
 
-### Services stoppen
+Für dasselbe Datum wird durch einen datumsabhängigen Seed immer derselbe Batch erzeugt.
 
-```bash
-docker compose down
-```
+## 2. Silver- und Quarantine-Layer erzeugen
 
-Die Daten in den Named Volumes bleiben dabei erhalten.
-
-### Services und lokale Docker-Daten vollständig entfernen
-
-Achtung: Der folgende Befehl löscht auch die erzeugten Daten und die lokale Airflow-Datenbank:
-
-```bash
-docker compose down -v
-```
-
-### Spark-Transformation ausführen
-
-Zum Beispiel mit:
 ```bash
 docker compose run --rm \
   --entrypoint python \
@@ -107,7 +139,63 @@ docker compose run --rm \
   --data-dir /opt/airflow/data
 ```
 
-### Tests ausführen
+Spark liest die Bronze-Daten mit einem expliziten Schema ein und wendet die Data-Quality-Regeln aus dem Projektkontext an.
+
+Gültige und deduplizierte Datensätze werden im Silver-Layer gespeichert:
+
+```text
+/opt/airflow/data/silver_processed/transactions/
+```
+
+Fehlerhafte Datensätze werden zusammen mit ihren Regelverletzungen im Quarantine-Layer gespeichert:
+
+```text
+/opt/airflow/data/quarantine/transactions/
+```
+
+Zusätzlich entsteht ein technischer Qualitätsbericht:
+
+```text
+/opt/airflow/data/reports/year=2026/month=01/day=01/quality_report.json
+```
+
+## 3. Gold-Layer erzeugen
+
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/spark/build_gold.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data
+```
+
+Der Gold-Job berechnet unter anderem:
+
+* Anzahl aller gültigen Transaktionen,
+* Approval-, Fraud- und Refund-Raten,
+* Purchase-, Refund- und Nettobeträge,
+* durchschnittlichen genehmigten Purchase-Betrag,
+* Länder- und Währungsaggregate.
+
+Die analytischen Daten werden als Parquet gespeichert:
+
+```text
+/opt/airflow/data/gold_analytics/daily_kpis/
+/opt/airflow/data/gold_analytics/country_currency_summary/
+```
+
+Zusätzlich wird eine kompakte JSON-Datei für nachgelagerte Anwendungen erzeugt:
+
+```text
+/opt/airflow/data/reports/year=2026/month=01/day=01/business_metrics.json
+```
+
+Die spätere KI-Komponente erhält nur diese aggregierten Kennzahlen und den aggregierten Qualitätsbericht. Einzelne Kunden-, Händler- oder Transaktionsdatensätze werden nicht an die externe API übertragen.
+
+## Tests ausführen
+
+Alle Unit- und Integrationstests:
 
 ```bash
 docker compose run --rm \
@@ -119,11 +207,55 @@ docker compose run --rm \
   -v
 ```
 
-### Silver/Quarantine/Report anzeigen
+Die Tests prüfen unter anderem:
 
-Vorläufig zum Beispiel mit:
+* Reproduzierbarkeit des Generators,
+* partitionierte JSONL-Ausgabe,
+* Schema Drift,
+* einzelne Data-Quality-Regeln,
+* Deduplizierung,
+* Aufteilung in Silver und Quarantine,
+* Berechnung der Gold-Kennzahlen.
+
+## Ergebnisse anzeigen
+
+Alle Laufzeitdateien:
+
 ```bash
- docker compose run --rm \
+docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+find /opt/airflow/data -type f | sort
+'
+```
+
+Qualitätsbericht:
+
+```bash
+docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+cat /opt/airflow/data/reports/year=2026/month=01/day=01/quality_report.json
+'
+```
+
+Business-Kennzahlen:
+
+```bash
+docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+cat /opt/airflow/data/reports/year=2026/month=01/day=01/business_metrics.json
+'
+```
+
+Verteilung der Quarantine-Regeln:
+
+```bash
+docker compose run --rm \
   --entrypoint /bin/bash \
   airflow \
   -lc '
@@ -145,8 +277,6 @@ path = (
 
 quarantine = spark.read.parquet(path)
 
-print("Quarantine rows:", quarantine.count())
-
 (
     quarantine
     .select(explode("dq_errors").alias("dq_rule"))
@@ -159,5 +289,39 @@ print("Quarantine rows:", quarantine.count())
 spark.stop()
 PY
 '
-
 ```
+
+## Services stoppen
+
+```bash
+docker compose down
+```
+
+Die Named Volumes bleiben dabei erhalten.
+
+Um auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank zu löschen:
+
+```bash
+docker compose down -v
+```
+
+## Aktueller Entwicklungsstand
+
+Implementiert:
+
+* Docker-Laufzeitumgebung
+* täglicher synthetischer Datengenerator
+* partitionierter Bronze-Layer
+* explizites Spark-Schema
+* Data Contract
+* acht Data-Quality-Regeln
+* Silver- und Quarantine-Layer
+* tägliche Gold-Kennzahlen
+* automatisierte Unit- und Integrationstests
+
+Geplant:
+
+* KI-gestützte Zusammenfassung mit strukturiertem JSON-Output
+* deterministisches Markdown-Rendering
+* vollständige Airflow-Orchestrierung
+* Quality Gate für kritische Pipeline-Fehler

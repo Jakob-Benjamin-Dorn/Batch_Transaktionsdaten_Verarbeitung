@@ -9,7 +9,7 @@ mkdir -p \
   airflow/dags \
   src/generator \
   src/spark \
-  src/ai_agent/templates \
+  src/ai_summary/templates \
   src/common \
   knowledge_base \
   tests/unit \
