@@ -1,5 +1,7 @@
 # Batch-Transaktionsdaten-Verarbeitung
 
+[![CI](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml/badge.svg)](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml)
+
 Ein Portfolio-Projekt für eine tägliche, reproduzierbare Batch-Datenpipeline mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
 
 Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow nicht nur theoretisch nachvollziehen zu können, sondern ihn auch praktisch umzusetzen und nachvollziehbar zu dokumentieren: von synthetischen Finanztransaktions-Rohdaten über Data Quality und Medallion-Architektur bis zur orchestrierten Berichterstellung.
@@ -429,6 +431,21 @@ docker compose down -v
 ```
 
 Achtung: Dadurch werden auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank entfernt.
+
+
+## Continuous Integration
+
+Das Projekt verwendet GitHub Actions für eine einfache CI-Pipeline.
+
+Bei Pushes auf `main`, Pull Requests und manueller Ausführung wird:
+
+1. das Docker-Image gebaut,
+2. ein Dependency-Smoke-Test ausgeführt,
+3. `pip check` ausgeführt,
+4. die komplette Unit-, Integrations- und DAG-Test-Suite im Container gestartet.
+
+Der echte LLM-API-Aufruf ist bewusst nicht Teil der CI-Pipeline, da er externe Kosten, Secrets und mögliche Flakiness verursachen würde.
+
 
 ## Aktueller Stand
 
