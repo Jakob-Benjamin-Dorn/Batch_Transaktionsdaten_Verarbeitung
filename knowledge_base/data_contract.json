@@ -193,5 +193,9 @@
       "description": "source_system must match an allowed normalized value.",
       "severity": "low"
     }
-  ]
+  ],
+  "quality_gate": {
+    "minimum_validity_rate": 0.85,
+    "maximum_high_severity_failure_rate": 0.1
+  }
 }
