@@ -24,11 +24,13 @@ from src.spark.data_quality import (
     event_time_in_future,
     invalid_currency,
     invalid_event_time,
+    invalid_ingestion_time,
     invalid_purchase_amount,
     invalid_refund,
     invalid_source_system,
     mark_duplicate_transactions,
     missing_customer_id,
+    missing_transaction_id,
 )
 from src.spark.schemas import TRANSACTION_BRONZE_SCHEMA
 
@@ -104,6 +106,10 @@ def prepare_transactions(
             trim(col("customer_id")),
         )
         .withColumn(
+            "transaction_id",
+            trim(col("transaction_id")),
+        )
+        .withColumn(
             "currency_normalized",
             upper(trim(col("currency"))),
         )
@@ -154,6 +160,14 @@ def prepare_transactions(
                     when(
                         invalid_source_system(),
                         lit("DQ008_INVALID_SOURCE_SYSTEM"),
+                    ),
+                    when(
+                        missing_transaction_id(),
+                        lit("DQ009_REQUIRED_TRANSACTION_ID"),
+                    ),
+                    when(
+                        invalid_ingestion_time(),
+                        lit("DQ010_INVALID_INGESTION_TIME"),
                     ),
                 )
             ),
@@ -221,6 +235,8 @@ def create_quality_report(
         "DQ006_INVALID_REFUND",
         "DQ007_DUPLICATE_TRANSACTION",
         "DQ008_INVALID_SOURCE_SYSTEM",
+        "DQ009_REQUIRED_TRANSACTION_ID",
+        "DQ010_INVALID_INGESTION_TIME",
     ]
 
     for rule_id in rule_ids:
