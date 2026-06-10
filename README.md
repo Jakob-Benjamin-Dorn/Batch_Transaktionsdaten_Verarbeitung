@@ -174,7 +174,7 @@ reports/year=2026/month=01/day=02/
 │       └── templates/
 │           └── summary.md.j2
 ├── knowledge_base/
-│   ├── data_contract.json
+│   └── data_contract.json
 ├── tests/
 │   ├── unit/
 │   ├── integration/
@@ -226,7 +226,7 @@ Airflow ist anschließend erreichbar unter:
 http://localhost:8080
 ```
 
-Die Zugangsdaten für Airflow können i.d.R. abgerufen werden unter:
+Beim lokalen Airflow-Setup mit Simple Auth Manager können die erzeugten Zugangsdaten beispielsweise so eingesehen werden:
 
 ```text
 docker compose exec airflow \
@@ -351,7 +351,16 @@ docker compose run --rm \
 
 ## Data Quality und Quality Gate
 
-Der Data Contract definiert Schema, erlaubte Werte, Regelbeschreibungen und Severity.
+Der Data Contract definiert Schema, erlaubte Werte, Regelbeschreibungen und Severity. Aktuell werden zehn Data-Quality-Regeln geprüft, unter anderem:
+
+- fehlende `customer_id`,
+- ungültige `currency`,
+- nicht parsebare oder zukünftige `event_time`,
+- ungültige Purchase- und Refund-Beträge,
+- ältere Duplikate pro `transaction_id`,
+- ungültige `source_system`,
+- fehlende `transaction_id`,
+- fehlende oder nicht parsebare `ingestion_time`.
 
 Das aktuelle Quality Gate stoppt den Core-DAG, wenn:
 
@@ -441,8 +450,7 @@ Bei Pushes auf `main`, Pull Requests und manueller Ausführung wird:
 
 1. das Docker-Image gebaut,
 2. ein Dependency-Smoke-Test ausgeführt,
-3. `pip check` ausgeführt,
-4. die komplette Unit-, Integrations- und DAG-Test-Suite im Container gestartet.
+3. die komplette Unit-, Integrations- und DAG-Test-Suite im Container gestartet.
 
 Der echte LLM-API-Aufruf ist bewusst nicht Teil der CI-Pipeline, da er externe Kosten, Secrets und mögliche Flakiness verursachen würde.
 
@@ -455,7 +463,7 @@ Implementiert:
 - synthetischer, deterministischer Tagesgenerator
 - Bronze-, Silver-, Quarantine- und Gold-Layer
 - explizites Spark-Schema und Data Contract
-- Data-Quality-Regeln und Deduplizierung
+- zehn Data-Quality-Regeln inklusive Deduplizierung und Zeitstempelvalidierung
 - konfigurierbares Quality Gate
 - täglicher decorator-basierter Core-DAG
 - separater KI-Reporting-DAG
@@ -465,12 +473,12 @@ Implementiert:
 - Pydantic- und fachliche Validierung
 - deterministisches Markdown-Rendering
 - automatisierte Unit-, Integrations- und DAG-Tests
+- GitHub Actions CI für Docker-Build und automatisierte Tests
 
 Mögliche nächste Schritte:
 
-- GitHub Actions für automatisierte CI-Tests
 - Vergleich von DeepSeek und Mistral
-- PostgreSQL und LocalExecutor (statt SequentialExecutor) für ein produktionsnäheres und python-zukunftsfähiges Airflow-Setup
+- PostgreSQL und LocalExecutor für ein produktionsnäheres Airflow-Setup
 - Alerting und Monitoring
 - Cloud Object Storage statt lokalem Named Volume
 - RAG mit internen Richtlinien oder Runbooks
