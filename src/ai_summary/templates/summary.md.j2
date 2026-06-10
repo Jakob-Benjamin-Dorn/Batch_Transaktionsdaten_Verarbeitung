@@ -1,0 +1,66 @@
+# Batch-Zusammenfassung – {{ summary.logical_date }}
+
+**Status:** {{ summary.overall_status | upper }}
+
+## Zusammenfassung
+
+{{ summary.executive_summary }}
+
+## Data-Quality-Findings
+
+{% if summary.findings %}
+| Severity | Regel | Finding | Beobachtung |
+|---|---|---|---|
+{% for finding in summary.findings %}
+| {{ finding.severity | upper }} | `{{ finding.rule_id }}` | {{ finding.title }} | {{ finding.observation }} |
+{% endfor %}
+{% else %}
+Es wurden keine relevanten Data-Quality-Findings gemeldet.
+{% endif %}
+
+{% if summary.findings %}
+### Details
+
+{% for finding in summary.findings %}
+#### {{ finding.title }}
+
+- **Regel:** `{{ finding.rule_id }}`
+- **Severity:** {{ finding.severity }}
+- **Beobachtung:** {{ finding.observation }}
+- **Business Impact:** {{ finding.business_impact }}
+- **Empfohlene Maßnahme:** {{ finding.recommended_action }}
+
+{% endfor %}
+{% endif %}
+
+## Business Highlights
+
+{% if summary.business_highlights %}
+{% for highlight in summary.business_highlights %}
+- {{ highlight }}
+{% endfor %}
+{% else %}
+Es wurden keine Business Highlights erzeugt.
+{% endif %}
+
+## Empfohlene nächste Schritte
+
+{% if summary.recommended_actions %}
+{% for action in summary.recommended_actions %}
+{{ loop.index }}. {{ action }}
+{% endfor %}
+{% else %}
+Es wurden keine zusätzlichen Maßnahmen empfohlen.
+{% endif %}
+
+---
+
+## Technische Metadaten
+
+- **Provider:** {{ provider }}
+- **Modell:** {{ model }}
+- **Prompt Tokens:** {{ usage.prompt_tokens }}
+- **Completion Tokens:** {{ usage.completion_tokens }}
+- **Gesamte Tokens:** {{ usage.total_tokens }}
+
+> Dieser Bericht wurde aus aggregierten Kennzahlen und Data-Quality-Metriken erzeugt. Es wurden keine einzelnen Kunden-, Händler- oder Transaktionsdatensätze an die externe API übermittelt.

@@ -5,6 +5,7 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile
 
 services:
+  # Temporärer Initialisierungs-Container der als Root Verzeichnisse erstellt und Rechte setzt
   airflow-init:
     <<: *airflow-common
 
@@ -44,6 +45,7 @@ services:
 
     restart: "no"
 
+# Dauerhaft laufender Container mit UID 50000 zur Ausführung von API-Servern, Schedulern und DAG-Prozessor
   airflow:
     <<: *airflow-common
 
@@ -72,6 +74,10 @@ services:
 
       PYTHONPATH: /opt/airflow
       HOME: /home/airflow
+
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-v4-flash}"
+      DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
