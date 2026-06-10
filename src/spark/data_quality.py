@@ -65,6 +65,7 @@ def invalid_purchase_amount() -> Column:
         )
     )
 
+
 def invalid_refund() -> Column:
     """DQ006: Refunds require negative amount and is_refund=true."""
     return (
@@ -75,6 +76,7 @@ def invalid_refund() -> Column:
             | (col("is_refund") != lit(True))
         )
     )
+
 
 def mark_duplicate_transactions(
     dataframe: DataFrame,
@@ -113,6 +115,7 @@ def mark_duplicate_transactions(
             size(col("dq_errors")) == 0,
         )
     )
+
 
 def invalid_source_system() -> Column:
     """DQ008: source_system must match a normalized allowed value."""
