@@ -94,3 +94,70 @@ Achtung: Der folgende Befehl löscht auch die erzeugten Daten und die lokale Air
 ```bash
 docker compose down -v
 ```
+
+### Spark-Transformation ausführen
+
+Zum Beispiel mit:
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/spark/transform_transactions.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data
+```
+
+### Tests ausführen
+
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  -m unittest discover \
+  -s /opt/airflow/tests \
+  -p "test_*.py" \
+  -v
+```
+
+### Silver/Quarantine/Report anzeigen
+
+Vorläufig zum Beispiel mit:
+```bash
+ docker compose run --rm \
+  --entrypoint /bin/bash \
+  airflow \
+  -lc '
+python - <<'"'"'PY'"'"'
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import explode
+
+spark = (
+    SparkSession.builder
+    .appName("inspect-quarantine")
+    .master("local[2]")
+    .getOrCreate()
+)
+
+path = (
+    "/opt/airflow/data/quarantine/transactions/"
+    "year=2026/month=01/day=01"
+)
+
+quarantine = spark.read.parquet(path)
+
+print("Quarantine rows:", quarantine.count())
+
+(
+    quarantine
+    .select(explode("dq_errors").alias("dq_rule"))
+    .groupBy("dq_rule")
+    .count()
+    .orderBy("dq_rule")
+    .show(truncate=False)
+)
+
+spark.stop()
+PY
+'
+
+```
