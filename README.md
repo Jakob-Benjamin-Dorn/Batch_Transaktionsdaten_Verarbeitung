@@ -1,90 +1,221 @@
 # Batch-Transaktionsdaten-Verarbeitung
 
-Dieses Portfolio-Projekt simuliert eine tägliche Batch-Datenpipeline für synthetische Finanztransaktionen.
+Ein Portfolio-Projekt für eine tägliche, reproduzierbare Batch-Datenpipeline mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
+
+Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow nicht nur theoretisch nachvollziehen zu können, sondern ihn auch praktisch umzusetzen und nachvollziehbar zu dokumentieren: von synthetischen Finanztransaktions-Rohdaten über Data Quality und Medallion-Architektur bis zur orchestrierten Berichterstellung.
+
+## Was das Projekt demonstriert
 
 Die Pipeline:
 
-1. erzeugt reproduzierbare tägliche Rohdaten,
-2. validiert und bereinigt sie mit Apache Spark,
-3. trennt gültige und fehlerhafte Datensätze,
-4. erstellt aggregierte Business-Kennzahlen,
-5. erzeugt später aus ausschließlich aggregierten Daten eine KI-gestützte Zusammenfassung,
-6. wird mit Apache Airflow orchestriert.
+1. erzeugt reproduzierbare tägliche Transaktionsdaten,
+2. schreibt unveränderte Rohdaten in einen partitionierten Bronze-Layer,
+3. validiert, normalisiert und dedupliziert die Daten mit Spark,
+4. trennt gültige Datensätze und Quarantänefälle,
+5. prüft ein deterministisches Quality Gate,
+6. erzeugt aggregierte Gold-Kennzahlen,
+7. gibt ausschließlich freigegebene Aggregate an ein LLM weiter,
+8. validiert dessen strukturierten JSON-Output,
+9. rendert daraus deterministisch einen Markdown-Bericht,
+10. orchestriert den Ablauf mit zwei getrennten Airflow-DAGs.
 
 ## Architektur
 
-```text
-Synthetic Data Generator
-        ↓
-Bronze: rohe JSONL-Transaktionen
-        ↓
-Spark Data Quality und Deduplizierung
-        ├── Silver: gültige, typisierte Parquet-Daten
-        └── Quarantine: ungültige Zeilen mit DQ-Regeln
-        ↓
-Gold: aggregierte Business-Kennzahlen
-        ↓
-KI-Zusammenfassung aus freigegebenen Metriken
+```mermaid
+flowchart TD
+    G[Python Generator] --> B[Bronze<br/>partitioniertes JSONL]
+    B --> S[Spark Transformation<br/>Schema, Normalisierung, DQ, Deduplizierung]
+    S --> V[Silver<br/>gültige Parquet-Daten]
+    S --> Q[Quarantine<br/>fehlerhafte Zeilen + DQ-Regeln]
+    S --> QR[Quality Report]
+    QR --> QG{Quality Gate}
+    QG -->|bestanden| GOLD[Gold Aggregationen]
+    QG -->|nicht bestanden| FAIL[Core-DAG stoppt]
+    GOLD --> BM[Business Metrics JSON]
+    QR --> P[Privacy-safe AI Payload]
+    BM --> P
+    P --> AI[LLM API<br/>strukturierter JSON-Output]
+    AI --> PV[Pydantic + fachliche Validierung]
+    PV --> MD[Jinja2 Markdown Report]
 ```
 
-Die Laufzeitumgebung wird vollständig mit Docker bereitgestellt. Eine lokale Python-, Java-, Spark- oder Airflow-Installation ist nicht notwendig.
+## Airflow-DAGs
 
-## Docker-Konzept
-
-Der Quellcode wird read-only in die Container eingebunden. Veränderliche Laufzeitdaten werden in Docker Named Volumes gespeichert.
+### Core-DAG: `batch_transaction_pipeline`
 
 ```text
-Bind-Mounts, read-only:
-- src/
-- tests/
-- airflow/dags/
-- knowledge_base/
-
-Named Volumes:
-- Bronze-, Silver-, Quarantine- und Gold-Daten
-- Airflow-Datenbank
-- Airflow-Logs
+generate_bronze
+→ transform_to_silver
+→ evaluate_quality_gate
+→ build_gold
+→ prepare_ai_payload
+→ trigger_ai_reporting_pipeline
 ```
 
-Ein Initialisierungs-Service richtet die benötigten Volumes und Berechtigungen ein. Dadurch ist keine Anpassung an eine Linux-Host-UID erforderlich.
+Der Core-DAG enthält nur die deterministischen Datenverarbeitungsschritte. Er kann erfolgreich abgeschlossen werden, sobald der separate KI-DAG gestartet wurde.
+
+### KI-DAG: `ai_reporting_pipeline`
+
+```text
+create_ai_summary
+→ render_markdown
+```
+
+Der KI-DAG ist bewusst getrennt. Ist die externe API vorübergehend nicht erreichbar, werden nur die KI-Tasks wiederholt oder als fehlgeschlagen markiert. Bronze-, Silver-, Quarantine- und Gold-Daten bleiben davon unberührt.
+
+Der Core-DAG verwendet:
+
+```python
+schedule="@daily"
+catchup=False
+max_active_runs=1
+```
+
+Dadurch werden beim ersten Aktivieren nicht automatisch alle historischen Tagesintervalle seit dem Startdatum nachgeholt.
+
+## Warum diese Technologien?
+
+### Docker
+
+Airflow, Spark, Java und Python-Abhängigkeiten lokal konsistent zu betreiben ist fehleranfällig. Docker stellt eine reproduzierbare Laufzeitumgebung bereit, ohne dass Python, Java, Spark oder Airflow auf dem Host installiert werden müssen.
+
+Quellcode und Konfiguration werden read-only eingebunden. Veränderliche Daten, Logs und Airflow-Zustände liegen in Named Volumes. Ein kurzlebiger `airflow-init`-Container richtet die Volumes als Root ein; der eigentliche Airflow-Service läuft anschließend unprivilegiert.
+
+### Apache Spark
+
+Für die derzeitige Datenmenge würde Pandas ausreichen. Spark wird bewusst verwendet, um eine skalierbare, schemaorientierte Verarbeitung mit DataFrames, Window Functions, Parquet und klar getrennten Daten-Layern zu demonstrieren.
+
+### Apache Airflow
+
+Airflow übernimmt Scheduling, Reihenfolge, Retries, Laufhistorie und Fehlerstatus. Die fachliche Logik bleibt in eigenständigen, testbaren CLI-Skripten. Die DAGs verwenden die moderne decorator-basierte TaskFlow-Schreibweise.
+
+### KI-Zusammenfassung
+
+Das LLM berechnet keine Kennzahlen und entscheidet nicht über Datenqualität. Spark und das Quality Gate liefern die Fakten. Die KI formuliert ausschließlich eine strukturierte Zusammenfassung aus aggregierten Metriken.
+
+Der Ablauf ist kontrolliert:
+
+```text
+aggregierte Reports
+→ feste Allowlist
+→ LLM mit JSON-Ausgabe
+→ Pydantic-Validierung
+→ fachliche Validierung
+→ Jinja2-Markdown
+```
+
+Der Provider ist perspektivisch austauschbar. Aktuell wird DeepSeek verwendet; ein Vergleich mit Mistral ist als spätere Erweiterung vorgesehen.
+
+## Datenschutz
+
+An die externe API werden keine Rohzeilen oder individuellen Identifikatoren übermittelt.
+
+Nicht freigegeben sind unter anderem:
+
+- `transaction_id`
+- `customer_id`
+- `merchant_id`
+- `device_id`
+- einzelne Zeitstempel
+- einzelne Beträge
+- Silver- oder Quarantine-Datensätze
+
+Erlaubt sind ausschließlich aggregierte Kennzahlen, Regelbeschreibungen und technische Data-Quality-Metriken. Eine feste Allowlist sorgt dafür, dass neue Felder nicht automatisch in das KI-Payload gelangen.
+
+API-Schlüssel werden ausschließlich über Umgebungsvariablen bereitgestellt und nicht in Git gespeichert.
+
+## Medallion- und Report-Struktur
+
+```text
+/opt/airflow/data/
+├── bronze_raw/
+├── silver_processed/
+├── quarantine/
+├── gold_analytics/
+└── reports/
+```
+
+Für einen erfolgreichen Tageslauf entstehen beispielsweise:
+
+```text
+reports/year=2026/month=01/day=02/
+├── quality_report.json
+├── business_metrics.json
+├── ai_input_payload.json
+├── ai_summary.json
+└── ai_summary.md
+```
+
+## Projektstruktur
+
+```text
+.
+├── airflow/
+│   └── dags/
+│       ├── batch_transaction_pipeline.py
+│       └── ai_reporting_pipeline.py
+├── src/
+│   ├── generator/
+│   │   └── generate_transactions.py
+│   ├── spark/
+│   │   ├── schemas.py
+│   │   ├── data_quality.py
+│   │   ├── transform_transactions.py
+│   │   ├── evaluate_quality_gate.py
+│   │   └── build_gold.py
+│   └── ai_summary/
+│       ├── prepare_payload.py
+│       ├── models.py
+│       ├── prompts.py
+│       ├── create_ai_summary.py
+│       ├── render_summary.py
+│       └── templates/
+│           └── summary.md.j2
+├── knowledge_base/
+│   ├── data_contract.json
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── dags/
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+└── .env.example
+```
 
 ## Voraussetzungen
 
-* Git
-* Docker
-* Docker Compose
+- Git
+- Docker
+- Docker Compose
 
-## Repository klonen
+## Schnellstart
+
+### Repository klonen
 
 ```bash
 git clone https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung.git
 cd Batch_Transaktionsdaten_Verarbeitung
 ```
 
-## Services starten
+### Umgebungsvariablen
 
-Beim ersten Start oder nach Änderungen an `Dockerfile` beziehungsweise `requirements.txt`:
+```bash
+cp .env.example .env
+```
+
+Danach den API-Key ausschließlich lokal in `.env` ergänzen.
+
+### Image bauen und Services starten
 
 ```bash
 docker compose up --build -d
 ```
 
-Bei späteren Starts:
+Bei späteren Starts ohne geänderte Abhängigkeiten:
 
 ```bash
 docker compose up -d
-```
-
-Status prüfen:
-
-```bash
-docker compose ps
-```
-
-Logs anzeigen:
-
-```bash
-docker compose logs -f airflow
 ```
 
 Airflow ist anschließend erreichbar unter:
@@ -93,9 +224,51 @@ Airflow ist anschließend erreichbar unter:
 http://localhost:8080
 ```
 
-## 1. Täglichen Bronze-Batch erzeugen
+Die Zugangsdaten für Airflow können i.d.R. abgerufen werden unter:
 
-Beispiel für den 1. Januar 2026:
+```text
+docker compose exec airflow \
+  cat /opt/airflow/state/simple_auth_manager_passwords.json
+```
+
+### DAGs aktivieren
+
+```bash
+docker compose exec airflow \
+  airflow dags unpause batch_transaction_pipeline
+```
+
+```bash
+docker compose exec airflow \
+  airflow dags unpause ai_reporting_pipeline
+```
+
+### Core-DAG für einen historischen Tag starten
+
+Verwende ein Datum, für das noch kein DAG-Run existiert:
+
+```bash
+docker compose exec airflow \
+  airflow dags trigger \
+  --logical-date 2026-01-03T00:00:00+00:00 \
+  batch_transaction_pipeline
+```
+
+### Runs kontrollieren
+
+```bash
+docker compose exec airflow \
+  airflow dags list-runs batch_transaction_pipeline
+```
+
+```bash
+docker compose exec airflow \
+  airflow dags list-runs ai_reporting_pipeline
+```
+
+## Manuelle Ausführung einzelner Stufen
+
+### Bronze
 
 ```bash
 docker compose run --rm \
@@ -106,29 +279,7 @@ docker compose run --rm \
   --output-dir /opt/airflow/data
 ```
 
-Die Rohdaten werden als partitionierte JSONL-Datei gespeichert:
-
-```text
-/opt/airflow/data/bronze_raw/transactions/
-└── year=2026/
-    └── month=01/
-        └── day=01/
-            └── transactions.jsonl
-```
-
-Der Generator erzeugt bewusst unter anderem:
-
-* Duplikate,
-* fehlende Kunden-IDs,
-* ungültige Währungen,
-* beschädigte und zukünftige Zeitstempel,
-* fehlerhafte Purchase- und Refund-Beträge,
-* verspätet eintreffende Events,
-* simulierte Schema Drift.
-
-Für dasselbe Datum wird durch einen datumsabhängigen Seed immer derselbe Batch erzeugt.
-
-## 2. Silver- und Quarantine-Layer erzeugen
+### Silver und Quarantine
 
 ```bash
 docker compose run --rm \
@@ -139,27 +290,19 @@ docker compose run --rm \
   --data-dir /opt/airflow/data
 ```
 
-Spark liest die Bronze-Daten mit einem expliziten Schema ein und wendet die Data-Quality-Regeln aus dem Projektkontext an.
+### Quality Gate
 
-Gültige und deduplizierte Datensätze werden im Silver-Layer gespeichert:
-
-```text
-/opt/airflow/data/silver_processed/transactions/
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/spark/evaluate_quality_gate.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data \
+  --contract-path /opt/airflow/knowledge_base/data_contract.json
 ```
 
-Fehlerhafte Datensätze werden zusammen mit ihren Regelverletzungen im Quarantine-Layer gespeichert:
-
-```text
-/opt/airflow/data/quarantine/transactions/
-```
-
-Zusätzlich entsteht ein technischer Qualitätsbericht:
-
-```text
-/opt/airflow/data/reports/year=2026/month=01/day=01/quality_report.json
-```
-
-## 3. Gold-Layer erzeugen
+### Gold
 
 ```bash
 docker compose run --rm \
@@ -170,32 +313,68 @@ docker compose run --rm \
   --data-dir /opt/airflow/data
 ```
 
-Der Gold-Job berechnet unter anderem:
+### Datenschutzgeprüftes KI-Payload
 
-* Anzahl aller gültigen Transaktionen,
-* Approval-, Fraud- und Refund-Raten,
-* Purchase-, Refund- und Nettobeträge,
-* durchschnittlichen genehmigten Purchase-Betrag,
-* Länder- und Währungsaggregate.
-
-Die analytischen Daten werden als Parquet gespeichert:
-
-```text
-/opt/airflow/data/gold_analytics/daily_kpis/
-/opt/airflow/data/gold_analytics/country_currency_summary/
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/ai_summary/prepare_payload.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data \
+  --contract-path /opt/airflow/knowledge_base/data_contract.json
 ```
 
-Zusätzlich wird eine kompakte JSON-Datei für nachgelagerte Anwendungen erzeugt:
+### KI-Zusammenfassung
 
-```text
-/opt/airflow/data/reports/year=2026/month=01/day=01/business_metrics.json
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/ai_summary/create_ai_summary.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data
 ```
 
-Die spätere KI-Komponente erhält nur diese aggregierten Kennzahlen und den aggregierten Qualitätsbericht. Einzelne Kunden-, Händler- oder Transaktionsdatensätze werden nicht an die externe API übertragen.
+### Markdown rendern
 
-## Tests ausführen
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/ai_summary/render_summary.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data
+```
 
-Alle Unit- und Integrationstests:
+## Data Quality und Quality Gate
+
+Der Data Contract definiert Schema, erlaubte Werte, Regelbeschreibungen und Severity.
+
+Das aktuelle Quality Gate stoppt den Core-DAG, wenn:
+
+- der Batch keine Eingabezeilen enthält,
+- die Validitätsrate unter 85 Prozent liegt,
+- eine einzelne High-Severity-Regel mehr als 10 Prozent der Eingabezeilen betrifft.
+
+Diese Schwellenwerte sind konfigurierbare Demo-Werte und keine allgemeinen Branchenstandards.
+
+## Retry-Verhalten
+
+| Task | Retries | Begründung |
+|---|---:|---|
+| `generate_bronze` | 1 | temporärer Dateisystemfehler möglich |
+| `transform_to_silver` | 1 | temporäre Spark-/JVM-Probleme möglich |
+| `evaluate_quality_gate` | 0 | deterministische Entscheidung |
+| `build_gold` | 1 | temporäre Spark-Probleme möglich |
+| `prepare_ai_payload` | 0 | deterministische lokale Verarbeitung |
+| `trigger_ai_reporting_pipeline` | 0 | Orchestrierung |
+| `create_ai_summary` | 3 | externe API, Netzwerk oder Rate Limit |
+| `render_markdown` | 0 | deterministisches Rendering |
+
+## Tests
+
+Alle Unit-, Integrations- und DAG-Strukturtests:
 
 ```bash
 docker compose run --rm \
@@ -209,338 +388,21 @@ docker compose run --rm \
 
 Die Tests prüfen unter anderem:
 
-* Reproduzierbarkeit des Generators,
-* partitionierte JSONL-Ausgabe,
-* Schema Drift,
-* einzelne Data-Quality-Regeln,
-* Deduplizierung,
-* Aufteilung in Silver und Quarantine,
-* Berechnung der Gold-Kennzahlen.
+- deterministische Datenerzeugung,
+- tägliche Partitionierung,
+- simulierte Schema Drift,
+- einzelne DQ-Regeln,
+- Deduplizierung,
+- Silver-/Quarantine-Split,
+- Gold-Aggregationen,
+- Quality Gate,
+- Datenschutz-Allowlist,
+- Pydantic-Modelle,
+- KI-Response-Validierung,
+- Markdown-Rendering,
+- DAG-Struktur und Retry-Konfiguration.
 
 ## Ergebnisse anzeigen
-
-Alle Laufzeitdateien:
-
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-find /opt/airflow/data -type f | sort
-'
-```
-
-Qualitätsbericht:
-
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-cat /opt/airflow/data/reports/year=2026/month=01/day=01/quality_report.json
-'
-```
-
-Business-Kennzahlen:
-
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-cat /opt/airflow/data/reports/year=2026/month=01/day=01/business_metrics.json
-'
-```
-
-Verteilung der Quarantine-Regeln:
-
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-python - <<'"'"'PY'"'"'
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import explode
-
-spark = (
-    SparkSession.builder
-    .appName("inspect-quarantine")
-    .master("local[2]")
-    .getOrCreate()
-)
-
-path = (
-    "/opt/airflow/data/quarantine/transactions/"
-    "year=2026/month=01/day=01"
-)
-
-quarantine = spark.read.parquet(path)
-
-(
-    quarantine
-    .select(explode("dq_errors").alias("dq_rule"))
-    .groupBy("dq_rule")
-    .count()
-    .orderBy("dq_rule")
-    .show(truncate=False)
-)
-
-spark.stop()
-PY
-'
-```
-
-## Services stoppen
-
-```bash
-docker compose down
-```
-
-Die Named Volumes bleiben dabei erhalten.
-
-Um auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank zu löschen:
-
-```bash
-docker compose down -v
-```
-
-## Aktueller Entwicklungsstand
-
-Implementiert:
-
-* zwei getrennte Airflow-DAGs
-* täglicher Core-DAG
-* deterministisches Quality Gate
-* task-spezifische Retries
-* separater KI-Reporting-DAG
-* automatische Übergabe des Batch-Datums
-* strukturierter DeepSeek-Report
-* deterministisches Markdown-Rendering
-* Docker-Laufzeitumgebung
-* täglicher synthetischer Datengenerator
-* partitionierter Bronze-Layer
-* explizites Spark-Schema
-* Data Contract
-* acht Data-Quality-Regeln
-* Silver- und Quarantine-Layer
-* tägliche Gold-Kennzahlen
-* automatisierte Unit- und Integrationstests
-
-Geplant:
-
-- optionaler Vergleich mehrerer KI-Provider
-- PostgreSQL statt SQLite für ein produktionsnäheres Airflow-Setup
-- CI-Pipeline für automatisierte Tests
-- optionale Alerting- und Monitoring-Erweiterungen
-
-## Airflow-Orchestrierung
-
-Die Pipeline wird durch zwei getrennte Airflow-DAGs orchestriert.
-
-### Core-DAG
-
-```text
-batch_transaction_pipeline
-```
-
-Der Core-DAG enthält ausschließlich die deterministischen Verarbeitungsschritte:
-
-```text
-generate_bronze
-        ↓
-transform_to_silver
-        ↓
-evaluate_quality_gate
-        ↓
-build_gold
-        ↓
-prepare_ai_payload
-        ↓
-trigger_ai_reporting_pipeline
-```
-
-Der DAG erzeugt:
-
-* den partitionierten Bronze-Batch,
-* bereinigte und deduplizierte Silver-Daten,
-* Quarantine-Daten mit Data-Quality-Fehlern,
-* den technischen Quality Report,
-* die Gold-Aggregationen,
-* das datenschutzgeprüfte AI-Payload.
-
-Der Core-DAG ist nicht vom Erfolg der externen KI-API abhängig. Nachdem der KI-DAG erfolgreich ausgelöst wurde, kann der Core-DAG als erfolgreich abgeschlossen werden.
-
-### KI-Reporting-DAG
-
-```text
-ai_reporting_pipeline
-```
-
-Der separate KI-DAG wird vom Core-DAG ausgelöst und besteht aus:
-
-```text
-create_ai_summary
-        ↓
-render_markdown
-```
-
-Der erste Task sendet ausschließlich aggregierte und freigegebene Kennzahlen an die DeepSeek-API. Die strukturierte Antwort wird lokal mit Pydantic validiert.
-
-Der zweite Task erzeugt anschließend deterministisch einen Markdown-Bericht aus dem validierten JSON.
-
-Ein Ausfall der externen API betrifft damit nur den KI-Reporting-DAG. Die zuvor erzeugten Bronze-, Silver-, Quarantine- und Gold-Daten bleiben erhalten, und der Core-DAG kann weiterhin erfolgreich sein.
-
-## Retry-Verhalten
-
-Retries werden nur für Schritte verwendet, bei denen ein erneuter Versuch sinnvoll sein kann.
-
-| Task                            | Retries | Begründung                                   |
-| ------------------------------- | ------: | -------------------------------------------- |
-| `generate_bronze`               |       1 | Temporärer Dateisystemfehler möglich         |
-| `transform_to_silver`           |       1 | Temporäre Spark- oder JVM-Probleme möglich   |
-| `evaluate_quality_gate`         |       0 | Deterministische Entscheidung                |
-| `build_gold`                    |       1 | Temporäre Spark-Probleme möglich             |
-| `prepare_ai_payload`            |       0 | Deterministische lokale Verarbeitung         |
-| `trigger_ai_reporting_pipeline` |       0 | Reiner Orchestrierungsschritt                |
-| `create_ai_summary`             |       3 | Externe API, Netzwerkfehler oder Rate Limits |
-| `render_markdown`               |       0 | Deterministisches lokales Rendering          |
-
-Der DeepSeek-Task verwendet einen exponentiellen Retry-Abstand. Ein vorübergehender API-Ausfall führt deshalb zunächst zu einem erneuten Versuch und nicht unmittelbar zu einem endgültigen Fehler.
-
-## Quality Gate
-
-Nach der Spark-Transformation wird der technische Quality Report gegen konfigurierbare Schwellenwerte aus dem Data Contract geprüft.
-
-Aktuelle Beispielkonfiguration:
-
-```json
-{
-  "quality_gate": {
-    "minimum_validity_rate": 0.85,
-    "maximum_high_severity_failure_rate": 0.1
-  }
-}
-```
-
-Der Core-DAG wird gestoppt, wenn:
-
-* der Batch keine Eingabezeilen enthält,
-* die Validitätsrate unter 85 Prozent fällt,
-* eine einzelne High-Severity-Regel mehr als 10 Prozent der Eingabezeilen betrifft.
-
-Die Schwellenwerte dienen als nachvollziehbare Beispielwerte für dieses Portfolio-Projekt und stellen keine allgemeinen Branchenstandards dar.
-
-## DAGs aktivieren
-
-Beide DAGs können über die Airflow-Oberfläche aktiviert werden:
-
-```text
-http://localhost:8080
-```
-
-Alternativ über die Kommandozeile:
-
-```bash
-docker compose exec airflow \
-  airflow dags unpause batch_transaction_pipeline
-```
-
-```bash
-docker compose exec airflow \
-  airflow dags unpause ai_reporting_pipeline
-```
-
-## Core-DAG manuell starten
-
-```bash
-docker compose exec airflow \
-  airflow dags trigger \
-  --logical-date 2026-01-02T00:00:00+00:00 \
-  batch_transaction_pipeline
-```
-
-Die logische Zeit beschreibt das zu verarbeitende Datenintervall und nicht zwingend den tatsächlichen Startzeitpunkt des Runs.
-
-## DAG-Runs kontrollieren
-
-Core-DAG:
-
-```bash
-docker compose exec airflow \
-  airflow dags list-runs \
-  batch_transaction_pipeline
-```
-
-KI-Reporting-DAG:
-
-```bash
-docker compose exec airflow \
-  airflow dags list-runs \
-  ai_reporting_pipeline
-```
-
-In der verwendeten Airflow-Version wird die DAG-ID bei `list-runs` als Positionsargument angegeben.
-
-## Task-Zustände eines Runs anzeigen
-
-```bash
-docker compose exec airflow \
-  airflow tasks states-for-dag-run \
-  ai_reporting_pipeline \
-  "<RUN_ID>"
-```
-
-Die Run-ID kann zuvor aus `airflow dags list-runs` übernommen werden.
-
-## DAG-Importfehler prüfen
-
-```bash
-docker compose exec airflow \
-  airflow dags list-import-errors
-```
-
-## Historischen Core-DAG testen
-
-```bash
-docker compose exec airflow \
-  airflow dags test \
-  batch_transaction_pipeline \
-  2026-01-01
-```
-
-Dieser Test führt die Core-Verarbeitung für den angegebenen logischen Tag aus und löst anschließend den KI-Reporting-DAG aus.
-
-## Ergebnisdateien
-
-Für einen vollständig erfolgreichen Lauf entstehen im Reports-Verzeichnis:
-
-```text
-/opt/airflow/data/reports/year=2026/month=01/day=01/
-├── quality_report.json
-├── business_metrics.json
-├── ai_input_payload.json
-├── ai_summary.json
-└── ai_summary.md
-```
-
-Dateien anzeigen:
-
-```bash
-docker compose run --rm \
-  --entrypoint /bin/bash \
-  airflow \
-  -lc '
-find \
-  /opt/airflow/data/reports/year=2026/month=01/day=01 \
-  -maxdepth 1 \
-  -type f \
-  -printf "%f\n" \
-  | sort
-'
-```
-
-Markdown-Bericht anzeigen:
 
 ```bash
 docker compose run --rm \
@@ -548,24 +410,55 @@ docker compose run --rm \
   airflow \
   -lc '
 sed -n "1,220p" \
-  /opt/airflow/data/reports/year=2026/month=01/day=01/ai_summary.md
+  /opt/airflow/data/reports/year=2026/month=01/day=02/ai_summary.md
 '
 ```
 
-## Fehlerverhalten
+## Services stoppen
 
-Das Projekt unterscheidet bewusst zwischen Datenverarbeitung und externer KI-Berichterstellung.
+Container stoppen, Daten behalten:
 
-```text
-Spark- oder Quality-Gate-Fehler
-→ Core-DAG schlägt fehl
-
-DeepSeek-API vorübergehend nicht erreichbar
-→ KI-Task wird erneut versucht
-
-DeepSeek-API dauerhaft nicht erreichbar
-→ KI-DAG schlägt fehl
-→ Core-DAG und Datenprodukte bleiben erfolgreich erhalten
+```bash
+docker compose down
 ```
 
-Diese Trennung verhindert, dass eine nicht verfügbare externe API die eigentliche Datenpipeline als fehlgeschlagen erscheinen lässt.
+Container und Named Volumes vollständig löschen:
+
+```bash
+docker compose down -v
+```
+
+Achtung: Dadurch werden auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank entfernt.
+
+## Aktueller Stand
+
+Implementiert:
+
+- Dockerisierte und reproduzierbare Laufzeitumgebung
+- synthetischer, deterministischer Tagesgenerator
+- Bronze-, Silver-, Quarantine- und Gold-Layer
+- explizites Spark-Schema und Data Contract
+- Data-Quality-Regeln und Deduplizierung
+- konfigurierbares Quality Gate
+- täglicher decorator-basierter Core-DAG
+- separater KI-Reporting-DAG
+- task-spezifische Retries
+- Privacy-Allowlist
+- strukturierte LLM-Ausgabe
+- Pydantic- und fachliche Validierung
+- deterministisches Markdown-Rendering
+- automatisierte Unit-, Integrations- und DAG-Tests
+
+Mögliche nächste Schritte:
+
+- GitHub Actions für automatisierte CI-Tests
+- Vergleich von DeepSeek und Mistral
+- PostgreSQL und LocalExecutor (statt SequentialExecutor) für ein produktionsnäheres und python-zukunftsfähiges Airflow-Setup
+- Alerting und Monitoring
+- Cloud Object Storage statt lokalem Named Volume
+- RAG mit internen Richtlinien oder Runbooks
+- kontrollierter Human-in-the-loop-Workflow für Folgeaktionen
+
+## Was ich dabei gelernt habe
+
+Das Projekt hat mir vor allem gezeigt, dass eine Pipeline nicht nur aus einer erfolgreichen Transformation besteht. Reproduzierbarkeit, klare Datenverträge, nachvollziehbare Fehlerpfade, Tests, Orchestrierung, Datenschutz und die Trennung deterministischer Logik von externen KI-Komponenten sind mindestens genauso wichtig wie der eigentliche Spark-Code.
