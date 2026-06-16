@@ -28,9 +28,8 @@ def missing_customer_id() -> Column:
     """DQ001: customer_id must not be null or empty."""
     return (
         col("customer_id").isNull()
-        | (col("customer_id") == "")
+        | (trim(col("customer_id")) == "")
     )
-
 
 def invalid_currency() -> Column:
     """DQ002: currency must be one of the supported ISO codes."""
@@ -97,12 +96,18 @@ def mark_duplicate_transactions(
         row_number().over(duplicate_window),
     )
 
+    has_transaction_id = (
+        col("transaction_id").isNotNull()
+        & (trim(col("transaction_id")) != "")
+    )
+
     return (
         ranked
         .withColumn(
             "dq_errors",
             when(
-                col("duplicate_rank") > 1,
+                has_transaction_id
+                & (col("duplicate_rank") > 1),
                 array_union(
                     col("dq_errors"),
                     array(

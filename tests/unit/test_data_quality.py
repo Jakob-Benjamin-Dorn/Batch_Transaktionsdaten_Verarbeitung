@@ -338,6 +338,64 @@ class TestDataQualityRules(unittest.TestCase):
 
         self.assertTrue(result)
 
+    def test_missing_transaction_id_is_not_marked_as_duplicate(self):
+        dataframe = self.prepare(
+            [
+                (
+                    None,
+                    "cus_1",
+                    "mer_1",
+                    "dev_1",
+                    "2026-01-01T10:00:00",
+                    "2026-01-01T10:05:00",
+                    20.0,
+                    "EUR",
+                    "DE",
+                    "Berlin",
+                    "card",
+                    "purchase",
+                    "approved",
+                    False,
+                    False,
+                    False,
+                    "mobile_app",
+                    None,
+                ),
+                (
+                    None,
+                    "cus_2",
+                    "mer_2",
+                    "dev_2",
+                    "2026-01-01T10:00:00",
+                    "2026-01-01T10:06:00",
+                    30.0,
+                    "EUR",
+                    "DE",
+                    "Berlin",
+                    "card",
+                    "purchase",
+                    "approved",
+                    False,
+                    False,
+                    False,
+                    "mobile_app",
+                    None,
+                ),
+            ]
+        )
+
+        rows = dataframe.collect()
+
+        for row in rows:
+            self.assertIn(
+                "DQ009_REQUIRED_TRANSACTION_ID",
+                row["dq_errors"],
+            )
+            self.assertNotIn(
+                "DQ007_DUPLICATE_TRANSACTION",
+                row["dq_errors"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

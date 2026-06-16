@@ -6,16 +6,24 @@
 
 {{ summary.executive_summary }}
 
-## Data-Quality-Findings
+{% set severity_labels = {
+    "critical": "kritisch",
+    "high": "hoch",
+    "medium": "mittel",
+    "low": "niedrig",
+    "info": "Info"
+} %}
+
+## Data-Quality-Befunde
 
 {% if summary.findings %}
-| Severity | Regel | Finding | Beobachtung |
+| Schweregrad | Regel | Befund | Beobachtung |
 |---|---|---|---|
 {% for finding in summary.findings %}
-| {{ finding.severity | upper }} | `{{ finding.rule_id }}` | {{ finding.title }} | {{ finding.observation }} |
+| {{ severity_labels.get(finding.severity, finding.severity) }} | `{{ finding.rule_id }}` | {{ finding.title }} | {{ finding.observation }} |
 {% endfor %}
 {% else %}
-Es wurden keine relevanten Data-Quality-Findings gemeldet.
+Es wurden keine relevanten Data-Quality-Befunde gemeldet.
 {% endif %}
 
 {% if summary.findings %}
@@ -25,9 +33,9 @@ Es wurden keine relevanten Data-Quality-Findings gemeldet.
 #### {{ finding.title }}
 
 - **Regel:** `{{ finding.rule_id }}`
-- **Severity:** {{ finding.severity }}
+- **Schweregrad:** {{ severity_labels.get(finding.severity, finding.severity) }}
 - **Beobachtung:** {{ finding.observation }}
-- **Business Impact:** {{ finding.business_impact }}
+- **Fachliche Auswirkung:** {{ finding.business_impact }}
 - **Empfohlene Maßnahme:** {{ finding.recommended_action }}
 
 {% endfor %}

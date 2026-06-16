@@ -130,6 +130,39 @@ class TestQualityGate(unittest.TestCase):
 
         self.assertTrue(failures)
 
+    def test_all_quality_rules_use_rule_id_key(self):
+        contract = {
+            "quality_rules": [
+                {
+                    "rule_id": "DQ009",
+                    "severity": "high",
+                }
+            ],
+            "quality_gate": {
+                "minimum_validity_rate": 0.85,
+                "maximum_high_severity_failure_rate": 0.1,
+            },
+        }
+
+        report = {
+            "input_rows": 100,
+            "validity_rate": 0.95,
+            "rule_failures": {
+                "DQ009_REQUIRED_TRANSACTION_ID": 11,
+            },
+        }
+
+        failures = evaluate_quality_gate(
+            quality_report=report,
+            contract=contract,
+        )
+
+        self.assertEqual(len(failures), 1)
+        self.assertIn(
+            "DQ009_REQUIRED_TRANSACTION_ID",
+            failures[0],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
