@@ -39,3 +39,6 @@ derby.log
 
 # Generierte Reports
 *.log
+
+# Lokale Archive und Exporte
+*.zip

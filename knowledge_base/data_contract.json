@@ -194,13 +194,13 @@
       "severity": "low"
     },
     {
-      "id": "DQ009",
+      "rule_id": "DQ009",
       "name": "required_transaction_id",
       "description": "transaction_id must not be null or empty.",
       "severity": "high"
     },
     {
-      "id": "DQ010",
+      "rule_id": "DQ010",
       "name": "valid_ingestion_time",
       "description": "ingestion_time must be present and parseable as a timestamp.",
       "severity": "high"

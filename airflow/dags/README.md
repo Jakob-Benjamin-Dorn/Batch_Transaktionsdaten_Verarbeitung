@@ -1,6 +1,6 @@
 # Airflow-Orchestrierung
 
-Dieser Ordner enthält die beiden DAGs, die die Pipeline steuern:
+Dieser Ordner enthält die beiden DAGs, welche die Pipeline steuern:
 
 ```text
 airflow/dags/

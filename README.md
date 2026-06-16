@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml/badge.svg)](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml)
 
-Ein Portfolio-Projekt für eine tägliche, reproduzierbare Batch-Datenpipeline mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
+Ein Portfolio-Projekt für eine reproduzierbare Batch-Datenpipeline u.a. mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
 
-Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow nicht nur theoretisch nachvollziehen zu können, sondern ihn auch praktisch umzusetzen und nachvollziehbar zu dokumentieren: von synthetischen Finanztransaktions-Rohdaten über Data Quality und Medallion-Architektur bis zur orchestrierten Berichterstellung.
+Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow nicht nur theoretisch begreifen zu können, sondern ihn auch praktisch umzusetzen und ihn nachvollziehbar zu machen: von synthetischen Finanztransaktions-Rohdaten über Data Quality und schema-orientierter Medallion-Architektur bis hin zur Bewertung anhand eines Datenvertrages und Berichterstellung samt datenschutzkonformer KI-Anbindung für automatisierte Business-Reports.
 
 ## Was das Projekt demonstriert
 
@@ -40,6 +40,20 @@ flowchart TD
     AI --> PV[Pydantic + fachliche Validierung]
     PV --> MD[Jinja2 Markdown Report]
 ```
+
+## Beispielergebnis
+
+### Airflow-Orchestrierung
+
+![Core-Airflow-DAG Pipeline-Schritte](docs/images/airflow_core_dag_graph.png)
+*Der Core-DAG verarbeitet die deterministischen Pipeline-Schritte und startet anschließend den separaten KI-DAG.*
+
+
+### Generierter KI-Report
+
+<img src= "docs/images/ai_summary_markdown_report.png" alt="Der finale Markdown-Bericht aus validiertem JSON-Output" style="border: 2px solid black;">
+*Der finale Markdown-Bericht wird aus einem validierten JSON-Output erzeugt. Die externe KI erhält ausschließlich aggregierte Kennzahlen und Data-Quality-Metriken.*
+
 
 ## Airflow-DAGs
 
@@ -95,7 +109,7 @@ Airflow übernimmt Scheduling, Reihenfolge, Retries, Laufhistorie und Fehlerstat
 
 Das LLM berechnet keine Kennzahlen und entscheidet nicht über Datenqualität. Spark und das Quality Gate liefern die Fakten. Die KI formuliert ausschließlich eine strukturierte Zusammenfassung aus aggregierten Metriken.
 
-Der Ablauf ist kontrolliert:
+Der Ablauf ist wie folgt kontrolliert:
 
 ```text
 aggregierte Reports
@@ -122,9 +136,9 @@ Nicht freigegeben sind unter anderem:
 - einzelne Beträge
 - Silver- oder Quarantine-Datensätze
 
-Erlaubt sind ausschließlich aggregierte Kennzahlen, Regelbeschreibungen und technische Data-Quality-Metriken. Eine feste Allowlist sorgt dafür, dass neue Felder nicht automatisch in das KI-Payload gelangen.
+Erlaubt sind ausschließlich aggregierte Kennzahlen, Regelbeschreibungen und technische Data-Quality-Metriken. Eine feste Allowlist sorgt dafür, dass neue Felder nicht automatisch in das KI-Payload gelangen. Zudem werden API-Schlüssel ausschließlich über Umgebungsvariablen bereitgestellt und nicht in Git gespeichert.
 
-API-Schlüssel werden ausschließlich über Umgebungsvariablen bereitgestellt und nicht in Git gespeichert.
+Für einen produktiven Einsatz müsste außerdem zusätzlich geprüft werden, ob die Nutzung des gewählten KI-Anbieters mit internen Compliance-Vorgaben, Datenschutzrecht, branchenspezifischen Anforderungen und dem EU AI Act vereinbar ist.
 
 ## Medallion- und Report-Struktur
 
@@ -225,6 +239,7 @@ Airflow ist anschließend erreichbar unter:
 ```text
 http://localhost:8080
 ```
+Der Port wird im Code bewusst nur an `127.0.0.1` gebunden, damit die lokale Airflow-UI nicht im Netzwerk freigegeben wird. 
 
 Beim lokalen Airflow-Setup mit Simple Auth Manager können die erzeugten Zugangsdaten beispielsweise so eingesehen werden:
 
@@ -269,6 +284,11 @@ docker compose exec airflow \
 ```
 
 ## Manuelle Ausführung einzelner Stufen
+
+Die Pipeline wird normalerweise über Airflow gestartet. Die einzelnen CLI-Skripte können bei Bedarf auch direkt im Container ausgeführt werden.
+
+<details>
+<summary>Einzelne Pipeline-Stufen manuell ausführen</summary>
 
 ### Bronze
 
@@ -349,6 +369,8 @@ docker compose run --rm \
   --data-dir /opt/airflow/data
 ```
 
+</details> 
+
 ## Data Quality und Quality Gate
 
 Der Data Contract definiert Schema, erlaubte Werte, Regelbeschreibungen und Severity. Aktuell werden zehn Data-Quality-Regeln geprüft, unter anderem:
@@ -362,7 +384,29 @@ Der Data Contract definiert Schema, erlaubte Werte, Regelbeschreibungen und Seve
 - fehlende `transaction_id`,
 - fehlende oder nicht parsebare `ingestion_time`.
 
-Das aktuelle Quality Gate stoppt den Core-DAG, wenn:
+Ein vereinfachter Ausschnitt aus dem Data Contract:
+
+```json
+{
+  "field": "event_time",
+  "type": "timestamp",
+  "nullable": false,
+  "description": "Timestamp when the transaction event occurred."
+}
+```
+
+Die Data-Quality-Regeln sind ebenfalls im Contract beschrieben:
+
+```json
+    {
+      "rule_id": "DQ004",
+      "name": "event_time_not_in_future",
+      "description": "event_time must not be later than the batch processing date.",
+      "severity": "high"
+    }
+```
+
+Das Quality Gate nutzt diese Regeldefinitionen, um technische Fehlerzahlen aus dem Spark-Report mit fachlichen Severity-Stufen zu bewerten. Das aktuelle Quality Gate stoppt den Core-DAG, wenn:
 
 - der Batch keine Eingabezeilen enthält,
 - die Validitätsrate unter 85 Prozent liegt,
@@ -382,6 +426,27 @@ Diese Schwellenwerte sind konfigurierbare Demo-Werte und keine allgemeinen Branc
 | `trigger_ai_reporting_pipeline` | 0 | Orchestrierung |
 | `create_ai_summary` | 3 | externe API, Netzwerk oder Rate Limit |
 | `render_markdown` | 0 | deterministisches Rendering |
+
+## Herausforderungen und Designentscheidungen
+
+Während der Umsetzung lagen die wichtigsten Herausforderungen nicht nur in der Transformation selbst, sondern in den Randbedingungen einer stabilen Pipeline.
+
+
+- Um ein unkontrolliertes, automatisches Nachholen historischer Tagesintervalle beim ersten Aktivieren der Pipeline zu vermeiden, wurde der Core-DAG strikt mit catchup=False und max_active_runs=1 konfiguriert.  
+
+- Um einen vollständigen Pipeline-Absturz oder Spark-Neuerechnungen bei einem Ausfall der externen KI-API zu vermeiden, wurde das System in zwei isolierte DAGs (Core und KI) mit einer task-spezifischen Retry-Logik aufgeteilt.  
+
+- Damit beim Triggern der KI-Reporting-Pipeline keine eindeutigen DagRun-Konflikte durch identische logical_date-Werte entstehen, wurde die Übergabe des fachlichen Batch-Datums flexibel über dag_run.conf gelöst.  
+
+- Das Bronze-Schema wurde so definiert, dass es event_time und ingestion_time zunächst als String einliest, damit ungültige Werte (wie not-a-timestamp) nicht direkt beim Einlesen verloren gehen. Erst danach werden die Werte kontrolliert per try_to_timestamp() transformiert.  
+
+- Um ein stilles, nicht nachvollziehbares Verwerfen fehlerhafter Datensätze zu vermeiden, wurde ein Quarantine-Layer implementiert, der ungültige Zeilen zusammen mit den verletzten Data-Quality-Regeln isoliert speichert.  
+
+- Damit das Quality Gate fachlich transparent, erklärbar und leicht anpassbar bleibt, wurde die Pipeline an einen formalen Data Contract mit Severity-Stufen und prozentualen Schwellenwerten gekoppelt.  
+
+- Vorbeugend gegen unerwartete JSON-Strukturen, erfundene Regel-IDs oder unpassende Freitexte des Sprachmodells wurde der LLM-API-Antwort eine Kombination aus JSON-Modus, Pydantic-Validierung und fachlicher ID-Prüfung nachgeschaltet.  
+
+- Um instabile CI-Builds und unkontrollierte API-Kosten in GitHub Actions zu vermeiden, wurde die Test-Suite so aufgebaut, dass sie alle Transformationen docker-basiert lokal validiert, den echten LLM-Aufruf jedoch ausspart.
 
 ## Tests
 
@@ -444,20 +509,16 @@ Achtung: Dadurch werden auch alle erzeugten Daten, Logs und die lokale Airflow-D
 
 ## Continuous Integration
 
-Das Projekt verwendet GitHub Actions für eine einfache CI-Pipeline.
-
-Bei Pushes auf `main`, Pull Requests und manueller Ausführung wird:
+Das Projekt verwendet GitHub Actions für eine einfache CI-Pipeline. Bei Pushes auf `main`, Pull Requests und manueller Ausführung wird:
 
 1. das Docker-Image gebaut,
 2. ein Dependency-Smoke-Test ausgeführt,
 3. die komplette Unit-, Integrations- und DAG-Test-Suite im Container gestartet.
 
-Der echte LLM-API-Aufruf ist bewusst nicht Teil der CI-Pipeline, da er externe Kosten, Secrets und mögliche Flakiness verursachen würde.
+Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die containerisierte Laufzeitumgebung, zentrale Abhängigkeiten, Spark-Tests und Airflow-DAG-Importe zusammen funktionieren. Der echte LLM-API-Aufruf ist bewusst nicht Teil der CI-Pipeline, da er externe Kosten und Secrets verursachen könnte.
 
 
 ## Aktueller Stand
-
-Implementiert:
 
 - Dockerisierte und reproduzierbare Laufzeitumgebung
 - synthetischer, deterministischer Tagesgenerator
@@ -475,14 +536,13 @@ Implementiert:
 - automatisierte Unit-, Integrations- und DAG-Tests
 - GitHub Actions CI für Docker-Build und automatisierte Tests
 
-Mögliche nächste Schritte:
+## Mögliche nächste Schritte
 
-- Vergleich von DeepSeek und Mistral
-- PostgreSQL und LocalExecutor für ein produktionsnäheres Airflow-Setup
-- Alerting und Monitoring
-- Cloud Object Storage statt lokalem Named Volume
-- RAG mit internen Richtlinien oder Runbooks
-- kontrollierter Human-in-the-loop-Workflow für Folgeaktionen
+- Vergleich von DeepSeek und Mistral: Gegenüberstellung mehrerer LLM-Anbieter hinsichtlich Antwortqualität, Kosten, Latenz, Datenschutzanforderungen und Integrationsaufwand.
+- Erweiterung der CI um Ruff/Black: Ergänzung der bestehenden GitHub-Actions-Pipeline um statische Codeanalyse und Formatprüfung.
+- PostgreSQL und LocalExecutor für Airflow: Ablösung des lokalen SQLite-Setups, das nur den SequentialExecutor-Modus ohne multiple Verbindungen unterstützt, durch ein produktionsnäheres Airflow-Setup mit Datenbank-Backend und paralleler Task-Ausführung.
+- Alerting und Monitoring: Benachrichtigungen bei fehlgeschlagenen DAG-Runs, Quality-Gate-Verletzungen oder dauerhaft fehlschlagenden KI-Tasks.
+- Cloud Object Storage statt lokalem Named Volume: Speicherung der Bronze-, Silver-, Quarantine- und Gold-Daten in AWS S3, Azure Blob Storage oder einem vergleichbaren Objektspeicher.
 
 ## Was ich dabei gelernt habe
 

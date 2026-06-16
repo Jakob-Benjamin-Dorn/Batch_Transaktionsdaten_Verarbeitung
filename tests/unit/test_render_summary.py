@@ -75,7 +75,7 @@ class TestRenderSummary(unittest.TestCase):
         )
 
         self.assertIn(
-            "## Data-Quality-Findings",
+            "## Data-Quality-Befunde",
             markdown,
         )
 
