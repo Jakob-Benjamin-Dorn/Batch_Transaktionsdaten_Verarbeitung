@@ -52,6 +52,7 @@ flowchart TD
 ### Generierter KI-Report
 
 <img src= "docs/images/ai_summary_markdown_report.png" alt="Der finale Markdown-Bericht aus validiertem JSON-Output" style="border: 2px solid black;">
+
 *Der finale Markdown-Bericht wird aus einem validierten JSON-Output erzeugt. Die externe KI erhält ausschließlich aggregierte Kennzahlen und Data-Quality-Metriken.*
 
 
