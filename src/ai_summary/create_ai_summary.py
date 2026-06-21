@@ -358,11 +358,6 @@ def main() -> None:
             payload=payload,
         )
 
-        validate_finding_rule_ids(
-            summary=summary,
-            payload=payload,
-        )
-
         sort_findings(
             summary=summary,
             payload=payload,
