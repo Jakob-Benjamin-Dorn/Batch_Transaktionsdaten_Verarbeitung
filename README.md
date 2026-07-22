@@ -1,25 +1,14 @@
 # Batch-Transaktionsdaten-Verarbeitung
 
 [![CI](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml/badge.svg)](https://github.com/Jakob-Benjamin-Dorn/Batch_Transaktionsdaten_Verarbeitung/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-3.1.8-017CEE?logo=apacheairflow&logoColor=white)
+![Apache Spark](https://img.shields.io/badge/Apache%20Spark-4.1.2-E25A1C?logo=apachespark&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
-Ein Portfolio-Projekt für eine reproduzierbare Batch-Datenpipeline u.a. mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
+Ein Data-Engineering-/Analytics-Engineering-Projekt für eine reproduzierbare Batch-Datenpipeline u.a. mit Python, Apache Spark, Apache Airflow, Docker und einer strukturierten KI-Zusammenfassung.
 
-Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow nicht nur theoretisch begreifen zu können, sondern ihn auch praktisch umzusetzen und ihn nachvollziehbar zu machen: von synthetischen Finanztransaktions-Rohdaten über Data Quality und schema-orientierter Medallion-Architektur bis hin zur Bewertung anhand eines Datenvertrages und Berichterstellung samt datenschutzkonformer KI-Anbindung für automatisierte Business-Reports.
-
-## Was das Projekt demonstriert
-
-Die Pipeline:
-
-1. erzeugt reproduzierbare tägliche Transaktionsdaten,
-2. schreibt unveränderte Rohdaten in einen partitionierten Bronze-Layer,
-3. validiert, normalisiert und dedupliziert die Daten mit Spark,
-4. trennt gültige Datensätze und Quarantänefälle,
-5. prüft ein deterministisches Quality Gate,
-6. erzeugt aggregierte Gold-Kennzahlen,
-7. gibt ausschließlich freigegebene Aggregate an ein LLM weiter,
-8. validiert dessen strukturierten JSON-Output,
-9. rendert daraus deterministisch einen Markdown-Bericht,
-10. orchestriert den Ablauf mit zwei getrennten Airflow-DAGs.
+Das Projekt entstand aus der Motivation, einen vollständigen Data-Engineering-Workflow praktisch umzusetzen und ihn nachvollziehbar zu machen: von synthetischen Finanztransaktions-Rohdaten über Data Quality und schema-orientierter Medallion-Architektur bis hin zur Bewertung anhand eines Datenvertrages und Berichterstellung samt datenschutzkonformer KI-Anbindung für automatisierte Business-Reports.
 
 ## Architektur
 
@@ -58,7 +47,7 @@ flowchart TD
 
 ## Airflow-DAGs
 
-### Core-DAG: `batch_transaction_pipeline`
+### 1. Core-DAG: `batch_transaction_pipeline`
 
 ```text
 generate_bronze
@@ -69,16 +58,11 @@ generate_bronze
 → trigger_ai_reporting_pipeline
 ```
 
-Der Core-DAG enthält nur die deterministischen Datenverarbeitungsschritte. Er kann erfolgreich abgeschlossen werden, sobald der separate KI-DAG gestartet wurde.
+Der Core-DAG enthält die deterministischen Datenverarbeitungsschritte. Er kann erfolgreich abgeschlossen werden, sobald der separate KI-DAG gestartet wurde.
 
-### KI-DAG: `ai_reporting_pipeline`
+### 2. KI-DAG: `ai_reporting_pipeline`
 
-```text
-create_ai_summary
-→ render_markdown
-```
-
-Der KI-DAG ist bewusst getrennt. Ist die externe API vorübergehend nicht erreichbar, werden nur die KI-Tasks wiederholt oder als fehlgeschlagen markiert. Bronze-, Silver-, Quarantine- und Gold-Daten bleiben davon unberührt.
+Der KI-DAG erstellt die KI-Zusammenfassung und rendert sie als Markdown. Der KI-Teil ist bewusst vom Core-DAG getrennt. Ist die externe API vorübergehend nicht erreichbar, werden nur die KI-Tasks wiederholt oder als fehlgeschlagen markiert. Bronze-, Silver-, Quarantine- und Gold-Daten bleiben davon unberührt.
 
 Der Core-DAG verwendet:
 
@@ -92,19 +76,11 @@ Dadurch werden beim ersten Aktivieren nicht automatisch alle historischen Tagesi
 
 ## Warum diese Technologien?
 
-### Docker
+**Docker**: Airflow, Spark, Java und Python-Abhängigkeiten lokal konsistent zu betreiben ist potenziell fehleranfällig. Docker stellt eine reproduzierbare Laufzeitumgebung bereit, ohne dass Python, Java, Spark oder Airflow auf dem Host installiert sein müssen. Quellcode und Konfiguration werden read-only eingebunden. Veränderliche Daten, Logs und Airflow-Zustände liegen in Named Volumes. Ein kurzlebiger `airflow-init`-Container richtet die Volumes als Root ein; der eigentliche Airflow-Service läuft anschließend unprivilegiert.
 
-Airflow, Spark, Java und Python-Abhängigkeiten lokal konsistent zu betreiben ist fehleranfällig. Docker stellt eine reproduzierbare Laufzeitumgebung bereit, ohne dass Python, Java, Spark oder Airflow auf dem Host installiert werden müssen.
+**Apache Spark**: Für die derzeitige Datenmenge würde Pandas ausreichen. Spark wird bewusst verwendet, um eine skalierbare, schemaorientierte Verarbeitung mit getrennten Daten-Layern zu demonstrieren.
 
-Quellcode und Konfiguration werden read-only eingebunden. Veränderliche Daten, Logs und Airflow-Zustände liegen in Named Volumes. Ein kurzlebiger `airflow-init`-Container richtet die Volumes als Root ein; der eigentliche Airflow-Service läuft anschließend unprivilegiert.
-
-### Apache Spark
-
-Für die derzeitige Datenmenge würde Pandas ausreichen. Spark wird bewusst verwendet, um eine skalierbare, schemaorientierte Verarbeitung mit DataFrames, Window Functions, Parquet und klar getrennten Daten-Layern zu demonstrieren.
-
-### Apache Airflow
-
-Airflow übernimmt Scheduling, Reihenfolge, Retries, Laufhistorie und Fehlerstatus. Die fachliche Logik bleibt in eigenständigen, testbaren CLI-Skripten. Die DAGs verwenden die moderne decorator-basierte TaskFlow-Schreibweise.
+**Apache Airflow**: Airflow übernimmt Scheduling, Reihenfolge, Retries, Laufhistorie und Fehlerstatus. Die fachliche Logik bleibt in eigenständigen, testbaren CLI-Skripten. Die DAGs verwenden die moderne decorator-basierte TaskFlow-Schreibweise.
 
 ### KI-Zusammenfassung
 
@@ -121,21 +97,11 @@ aggregierte Reports
 → Jinja2-Markdown
 ```
 
-Der Provider ist perspektivisch austauschbar. Aktuell wird DeepSeek verwendet; ein Vergleich mit Mistral ist als spätere Erweiterung vorgesehen.
+Der Provider ist perspektivisch austauschbar. Aktuell wird DeepSeek verwendet; ein Vergleich mit anderen Modellen wie z.B. Mistral ist als spätere Erweiterung vorgesehen.
 
 ## Datenschutz
 
-An die externe API werden keine Rohzeilen oder individuellen Identifikatoren übermittelt.
-
-Nicht freigegeben sind unter anderem:
-
-- `transaction_id`
-- `customer_id`
-- `merchant_id`
-- `device_id`
-- einzelne Zeitstempel
-- einzelne Beträge
-- Silver- oder Quarantine-Datensätze
+An die externe API werden keine Rohzeilen oder individuellen Identifikatoren übermittelt. Nicht freigegeben sind unter anderem: `transaction_id`, `customer_id`, `merchant_id`, `device_id`, einzelne Zeitstempel oder Beiträge.
 
 Erlaubt sind ausschließlich aggregierte Kennzahlen, Regelbeschreibungen und technische Data-Quality-Metriken. Eine feste Allowlist sorgt dafür, dass neue Felder nicht automatisch in das KI-Payload gelangen. Zudem werden API-Schlüssel ausschließlich über Umgebungsvariablen bereitgestellt und nicht in Git gespeichert.
 
@@ -413,7 +379,7 @@ Das Quality Gate nutzt diese Regeldefinitionen, um technische Fehlerzahlen aus d
 - die Validitätsrate unter 85 Prozent liegt,
 - eine einzelne High-Severity-Regel mehr als 10 Prozent der Eingabezeilen betrifft.
 
-Diese Schwellenwerte sind konfigurierbare Demo-Werte und keine allgemeinen Branchenstandards.
+Diese Schwellenwerte stellen veränderliche Werte zu Demonstrationszwecken dar und sind nicht in Stein gemeißelt.
 
 ## Retry-Verhalten
 
@@ -463,21 +429,7 @@ docker compose run --rm \
   -v
 ```
 
-Die Tests prüfen unter anderem:
-
-- deterministische Datenerzeugung,
-- tägliche Partitionierung,
-- simulierte Schema Drift,
-- einzelne DQ-Regeln,
-- Deduplizierung,
-- Silver-/Quarantine-Split,
-- Gold-Aggregationen,
-- Quality Gate,
-- Datenschutz-Allowlist,
-- Pydantic-Modelle,
-- KI-Response-Validierung,
-- Markdown-Rendering,
-- DAG-Struktur und Retry-Konfiguration.
+Die Tests prüfen unter anderem die Datenerzeugung, tägliche Partitionierung, Schema-Drift, einzelne Data-Quality-Regeln, die Gold-Aggregationen, Datenschutzliste, das Markdown-Rendering und die DAG-Struktur.
 
 ## Ergebnisse anzeigen
 
@@ -499,13 +451,7 @@ Container stoppen, Daten behalten:
 docker compose down
 ```
 
-Container und Named Volumes vollständig löschen:
-
-```bash
-docker compose down -v
-```
-
-Achtung: Dadurch werden auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank entfernt.
+Container und Named Volumes vollständig löschen mit der zusätzlichen `-v`-Flag. Aber Achtung: dadurch werden auch alle erzeugten Daten, Logs und die lokale Airflow-Datenbank entfernt.
 
 
 ## Continuous Integration
@@ -539,12 +485,12 @@ Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die contain
 
 ## Mögliche nächste Schritte
 
-- Vergleich von DeepSeek und Mistral: Gegenüberstellung mehrerer LLM-Anbieter hinsichtlich Antwortqualität, Kosten, Latenz, Datenschutzanforderungen und Integrationsaufwand.
+- Vergleich von DeepSeek und anderen KI-Anbietern wie Anthrophic oder Mistral: Gegenüberstellung mehrerer LLMs hinsichtlich Antwortqualität, Kosten, Latenz, Datenschutzanforderungen und Integrationsaufwand.
 - Erweiterung der CI um Ruff/Black: Ergänzung der bestehenden GitHub-Actions-Pipeline um statische Codeanalyse und Formatprüfung.
 - PostgreSQL und LocalExecutor für Airflow: Ablösung des lokalen SQLite-Setups, das nur den SequentialExecutor-Modus ohne multiple Verbindungen unterstützt, durch ein produktionsnäheres Airflow-Setup mit Datenbank-Backend und paralleler Task-Ausführung.
 - Alerting und Monitoring: Benachrichtigungen bei fehlgeschlagenen DAG-Runs, Quality-Gate-Verletzungen oder dauerhaft fehlschlagenden KI-Tasks.
 - Cloud Object Storage statt lokalem Named Volume: Speicherung der Bronze-, Silver-, Quarantine- und Gold-Daten in AWS S3, Azure Blob Storage oder einem vergleichbaren Objektspeicher.
 
-## Was ich dabei gelernt habe
+## Learnings
 
 Das Projekt hat mir vor allem gezeigt, dass eine Pipeline nicht nur aus einer erfolgreichen Transformation besteht. Reproduzierbarkeit, klare Datenverträge, nachvollziehbare Fehlerpfade, Tests, Orchestrierung, Datenschutz und die Trennung deterministischer Logik von externen KI-Komponenten sind mindestens genauso wichtig wie der eigentliche Spark-Code.
