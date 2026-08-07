@@ -5,6 +5,32 @@ x-airflow-common: &airflow-common
     dockerfile: Dockerfile
 
 services:
+
+  analytics-db:
+    image: postgres:16-alpine
+
+    environment:
+      POSTGRES_DB: "${ANALYTICS_DB_NAME:-analytics}"
+      POSTGRES_USER: "${ANALYTICS_DB_USER:-analytics}"
+      POSTGRES_PASSWORD: "${ANALYTICS_DB_PASSWORD:-analytics_local}"
+
+    ports:
+      - "127.0.0.1:5433:5432"
+
+    volumes:
+      - analytics_db:/var/lib/postgresql/data
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${ANALYTICS_DB_USER:-analytics} -d ${ANALYTICS_DB_NAME:-analytics}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # Temporärer Initialisierungs-Container der als Root Verzeichnisse erstellt und Rechte setzt
   airflow-init:
     <<: *airflow-common
@@ -54,6 +80,9 @@ services:
     depends_on:
       airflow-init:
         condition: service_completed_successfully
+      
+      analytics-db:
+        condition: service_healthy
 
     ports:
       - "127.0.0.1:8080:8080"
@@ -78,6 +107,12 @@ services:
       DEEPSEEK_MODEL: "${DEEPSEEK_MODEL:-deepseek-v4-flash}"
       DEEPSEEK_BASE_URL: "${DEEPSEEK_BASE_URL:-https://api.deepseek.com}"
 
+      ANALYTICS_DB_HOST: analytics-db
+      ANALYTICS_DB_PORT: "5432"
+      ANALYTICS_DB_NAME: "${ANALYTICS_DB_NAME:-analytics}"
+      ANALYTICS_DB_USER: "${ANALYTICS_DB_USER:-analytics}"
+      ANALYTICS_DB_PASSWORD: "${ANALYTICS_DB_PASSWORD:-analytics_local}"
+
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./src:/opt/airflow/src:ro
@@ -101,7 +136,9 @@ services:
 
         exec airflow scheduler
 
+
 volumes:
   airflow_data:
   airflow_state:
   airflow_logs:
+  analytics_db:
