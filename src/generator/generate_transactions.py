@@ -9,6 +9,8 @@ import hashlib
 import numpy as np
 import pandas as pd
 
+from src.common.dates import validate_logical_date
+
 
 # -----------------------------
 # Konfiguration
@@ -538,12 +540,7 @@ def save_bronze_batch(
 def main() -> None:
     args = parse_args()
 
-    try:
-        datetime.fromisoformat(args.logical_date)
-    except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use the format YYYY-MM-DD"
-        ) from exc
+    validate_logical_date(args.logical_date)
 
     cfg = Config(
         start_date=args.logical_date,

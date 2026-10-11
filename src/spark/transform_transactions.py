@@ -33,6 +33,7 @@ from src.spark.data_quality import (
     missing_transaction_id,
 )
 from src.spark.schemas import TRANSACTION_BRONZE_SCHEMA
+from src.common.dates import validate_logical_date
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,15 +57,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def validate_logical_date(logical_date: str) -> None:
-    try:
-        datetime.strptime(logical_date, "%Y-%m-%d")
-    except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use the format YYYY-MM-DD"
-        ) from exc
 
 
 def partition_path(

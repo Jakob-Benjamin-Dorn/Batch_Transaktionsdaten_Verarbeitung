@@ -14,7 +14,6 @@ from src.analytics.load_to_postgres import (
     metrics_path,
     pick,
     read_metrics,
-    validate_logical_date,
 )
 
 
@@ -82,12 +81,6 @@ def sample_metrics(logical_date: str = "2026-01-01") -> dict:
 
 
 class TestLoadToPostgres(unittest.TestCase):
-    def test_validate_logical_date(self):
-        validate_logical_date("2026-01-01")
-
-        with self.assertRaises(ValueError):
-            validate_logical_date("01.01.2026")
-
     def test_metrics_path_uses_report_partitioning(self):
         path = metrics_path("/data", "2026-01-02")
 

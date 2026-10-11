@@ -148,6 +148,8 @@ reports/year=2026/month=01/day=02/
 │   │   ├── transform_transactions.py
 │   │   ├── evaluate_quality_gate.py
 │   │   └── build_gold.py
+│   ├── common/
+│   │   └── dates.py
 │   ├── analytics/
 │   │   └── load_to_postgres.py
 │   └── ai_summary/
