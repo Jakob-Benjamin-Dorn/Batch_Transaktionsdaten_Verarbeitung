@@ -173,6 +173,7 @@ reports/year=2026/month=01/day=02/
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
+├── ruff.toml
 └── .env.example
 ```
 
@@ -478,11 +479,20 @@ Container und Named Volumes vollständig löschen mit der zusätzlichen `-v`-Fla
 
 ## Continuous Integration
 
-Das Projekt verwendet GitHub Actions für eine einfache CI-Pipeline. Bei Pushes auf `main`, Pull Requests und manueller Ausführung wird:
+Das Projekt verwendet GitHub Actions für eine einfache CI-Pipeline. Bei Pushes auf `main`, Pull Requests und manueller Ausführung laufen zwei Jobs:
 
-1. das Docker-Image gebaut,
-2. ein Dependency-Smoke-Test ausgeführt,
-3. die komplette Unit-, Integrations- und DAG-Test-Suite im Container gestartet.
+**`lint`** (schnell, ohne Docker)
+
+1. `ruff check .` prüft den Code statisch (Fehler, ungenutzte Imports, Import-Reihenfolge u.a.),
+2. `ruff format --check .` stellt sicher, dass der Code einheitlich formatiert ist.
+
+**`docker-tests`**
+
+1. das Docker-Image wird gebaut,
+2. ein Dependency-Smoke-Test wird ausgeführt,
+3. die komplette Unit-, Integrations- und DAG-Test-Suite wird im Container gestartet.
+
+Lokal lassen sich die Prüfungen mit `pip install ruff==0.16.8` und anschließend `ruff check .` bzw. `ruff format .` ausführen. Die Regeln stehen in `ruff.toml`.
 
 Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die containerisierte Laufzeitumgebung, zentrale Abhängigkeiten, Spark-Tests und Airflow-DAG-Importe zusammen funktionieren. Der echte LLM-API-Aufruf ist bewusst nicht Teil der CI-Pipeline, da er externe Kosten und Secrets verursachen könnte.
 
@@ -505,11 +515,11 @@ Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die contain
 - deterministisches Markdown-Rendering
 - automatisierte Unit-, Integrations- und DAG-Tests
 - GitHub Actions CI für Docker-Build und automatisierte Tests
+- Ruff für Linting und Formatierung (lokal und in der CI)
 
 ## Mögliche nächste Schritte
 
 - Vergleich von DeepSeek und anderen KI-Anbietern wie Anthrophic oder Mistral: Gegenüberstellung mehrerer LLMs hinsichtlich Antwortqualität, Kosten, Latenz, Datenschutzanforderungen und Integrationsaufwand.
-- Erweiterung der CI um Ruff/Black: Ergänzung der bestehenden GitHub-Actions-Pipeline um statische Codeanalyse und Formatprüfung.
 - PostgreSQL als Airflow-Metadatenbank: Ablösung des lokalen SQLite-Setups (nur für Entwicklung gedacht, Schreib-Locks bei parallelen Tasks) durch ein produktionsnäheres Setup, in dem Tasks sicher parallel laufen können.
 - Alerting und Monitoring: Benachrichtigungen bei fehlgeschlagenen DAG-Runs, Quality-Gate-Verletzungen oder dauerhaft fehlschlagenden KI-Tasks.
 - Cloud Object Storage statt lokalem Named Volume: Speicherung der Bronze-, Silver-, Quarantine- und Gold-Daten in AWS S3, Azure Blob Storage oder einem vergleichbaren Objektspeicher.
