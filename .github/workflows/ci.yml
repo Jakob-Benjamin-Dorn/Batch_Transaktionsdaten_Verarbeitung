@@ -32,6 +32,7 @@ jobs:
           import numpy
           import openai
           import pandas
+          import psycopg2
           import pydantic
           import pyspark
 

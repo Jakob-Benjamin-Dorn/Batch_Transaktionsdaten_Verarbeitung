@@ -117,6 +117,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./src:/opt/airflow/src:ro
       - ./knowledge_base:/opt/airflow/knowledge_base:ro
+      - ./sql:/opt/airflow/sql:ro
       - ./tests:/opt/airflow/tests:ro
 
       - airflow_data:/opt/airflow/data

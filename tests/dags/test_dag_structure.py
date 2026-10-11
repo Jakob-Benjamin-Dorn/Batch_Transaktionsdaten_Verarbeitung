@@ -45,6 +45,7 @@ class TestDagStructure(unittest.TestCase):
             "transform_to_silver",
             "evaluate_quality_gate",
             "build_gold",
+            "load_to_postgres",
             "prepare_ai_payload",
             "trigger_ai_reporting_pipeline",
         }
@@ -62,6 +63,13 @@ class TestDagStructure(unittest.TestCase):
                 "evaluate_quality_gate"
             ).retries,
             0,
+        )
+
+        self.assertEqual(
+            dag.get_task(
+                "load_to_postgres"
+            ).retries,
+            1,
         )
 
         self.assertEqual(
@@ -130,6 +138,10 @@ class TestDagStructure(unittest.TestCase):
             ),
             (
                 "build_gold",
+                "load_to_postgres",
+            ),
+            (
+                "load_to_postgres",
                 "prepare_ai_payload",
             ),
             (

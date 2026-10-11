@@ -23,6 +23,7 @@ flowchart TD
     QG -->|bestanden| GOLD[Gold Aggregationen]
     QG -->|nicht bestanden| FAIL[Core-DAG stoppt]
     GOLD --> BM[Business Metrics JSON]
+    BM --> PG[(PostgreSQL<br/>analytics + marts)]
     QR --> P[Privacy-safe AI Payload]
     BM --> P
     P --> AI[LLM API<br/>strukturierter JSON-Output]
@@ -54,6 +55,7 @@ generate_bronze
 → transform_to_silver
 → evaluate_quality_gate
 → build_gold
+→ load_to_postgres
 → prepare_ai_payload
 → trigger_ai_reporting_pipeline
 ```
@@ -146,6 +148,8 @@ reports/year=2026/month=01/day=02/
 │   │   ├── transform_transactions.py
 │   │   ├── evaluate_quality_gate.py
 │   │   └── build_gold.py
+│   ├── analytics/
+│   │   └── load_to_postgres.py
 │   └── ai_summary/
 │       ├── prepare_payload.py
 │       ├── models.py
@@ -154,6 +158,10 @@ reports/year=2026/month=01/day=02/
 │       ├── render_summary.py
 │       └── templates/
 │           └── summary.md.j2
+├── sql/
+│   └── init/
+│       ├── 001_create_schemas.sql
+│       └── 002_create_gold_tables.sql
 ├── knowledge_base/
 │   └── data_contract.json
 ├── tests/
@@ -302,6 +310,17 @@ docker compose run --rm \
   --data-dir /opt/airflow/data
 ```
 
+### Gold nach PostgreSQL laden
+
+```bash
+docker compose run --rm \
+  --entrypoint python \
+  airflow \
+  /opt/airflow/src/analytics/load_to_postgres.py \
+  --logical-date 2026-01-01 \
+  --data-dir /opt/airflow/data
+```
+
 ### Datenschutzgeprüftes KI-Payload
 
 ```bash
@@ -389,6 +408,7 @@ Diese Schwellenwerte stellen veränderliche Werte zu Demonstrationszwecken dar u
 | `transform_to_silver` | 1 | temporäre Spark-/JVM-Probleme möglich |
 | `evaluate_quality_gate` | 0 | deterministische Entscheidung |
 | `build_gold` | 1 | temporäre Spark-Probleme möglich |
+| `load_to_postgres` | 1 | kurzzeitige Datenbank-Verbindungsprobleme möglich |
 | `prepare_ai_payload` | 0 | deterministische lokale Verarbeitung |
 | `trigger_ai_reporting_pipeline` | 0 | Orchestrierung |
 | `create_ai_summary` | 3 | externe API, Netzwerk oder Rate Limit |
@@ -476,6 +496,7 @@ Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die contain
 - täglicher decorator-basierter Core-DAG
 - separater KI-Reporting-DAG
 - task-spezifische Retries
+- PostgreSQL-Serving-Layer (`analytics`-Tabellen, idempotenter Load pro Batch-Tag, Beispiel-View in `marts`)
 - Privacy-Allowlist
 - strukturierte LLM-Ausgabe
 - Pydantic- und fachliche Validierung
@@ -487,7 +508,7 @@ Damit prüft die CI nicht nur Python-Code isoliert, sondern auch, ob die contain
 
 - Vergleich von DeepSeek und anderen KI-Anbietern wie Anthrophic oder Mistral: Gegenüberstellung mehrerer LLMs hinsichtlich Antwortqualität, Kosten, Latenz, Datenschutzanforderungen und Integrationsaufwand.
 - Erweiterung der CI um Ruff/Black: Ergänzung der bestehenden GitHub-Actions-Pipeline um statische Codeanalyse und Formatprüfung.
-- PostgreSQL und LocalExecutor für Airflow: Ablösung des lokalen SQLite-Setups, das nur den SequentialExecutor-Modus ohne multiple Verbindungen unterstützt, durch ein produktionsnäheres Airflow-Setup mit Datenbank-Backend und paralleler Task-Ausführung.
+- PostgreSQL als Airflow-Metadatenbank: Ablösung des lokalen SQLite-Setups (nur für Entwicklung gedacht, Schreib-Locks bei parallelen Tasks) durch ein produktionsnäheres Setup, in dem Tasks sicher parallel laufen können.
 - Alerting und Monitoring: Benachrichtigungen bei fehlgeschlagenen DAG-Runs, Quality-Gate-Verletzungen oder dauerhaft fehlschlagenden KI-Tasks.
 - Cloud Object Storage statt lokalem Named Volume: Speicherung der Bronze-, Silver-, Quarantine- und Gold-Daten in AWS S3, Azure Blob Storage oder einem vergleichbaren Objektspeicher.
 
