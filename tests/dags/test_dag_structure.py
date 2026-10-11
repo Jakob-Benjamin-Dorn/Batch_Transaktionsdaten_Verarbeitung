@@ -16,9 +16,7 @@ def load_dag_module(filename: str):
     )
 
     if spec is None or spec.loader is None:
-        raise RuntimeError(
-            f"Could not load DAG module: {path}"
-        )
+        raise RuntimeError(f"Could not load DAG module: {path}")
 
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -28,9 +26,7 @@ def load_dag_module(filename: str):
 
 class TestDagStructure(unittest.TestCase):
     def test_core_dag_structure(self):
-        module = load_dag_module(
-            "batch_transaction_pipeline.py"
-        )
+        module = load_dag_module("batch_transaction_pipeline.py")
 
         dag = module.dag
 
@@ -58,30 +54,22 @@ class TestDagStructure(unittest.TestCase):
         self.assertEqual(dag.max_active_runs, 1)
 
         self.assertEqual(
-            dag.get_task(
-                "evaluate_quality_gate"
-            ).retries,
+            dag.get_task("evaluate_quality_gate").retries,
             0,
         )
 
         self.assertEqual(
-            dag.get_task(
-                "load_to_postgres"
-            ).retries,
+            dag.get_task("load_to_postgres").retries,
             1,
         )
 
         self.assertEqual(
-            dag.get_task(
-                "prepare_ai_payload"
-            ).retries,
+            dag.get_task("prepare_ai_payload").retries,
             0,
         )
 
     def test_ai_dag_structure(self):
-        module = load_dag_module(
-            "ai_reporting_pipeline.py"
-        )
+        module = load_dag_module("ai_reporting_pipeline.py")
 
         dag = module.dag
 
@@ -102,23 +90,17 @@ class TestDagStructure(unittest.TestCase):
         self.assertFalse(dag.catchup)
 
         self.assertEqual(
-            dag.get_task(
-                "create_ai_summary"
-            ).retries,
+            dag.get_task("create_ai_summary").retries,
             3,
         )
 
         self.assertEqual(
-            dag.get_task(
-                "render_markdown"
-            ).retries,
+            dag.get_task("render_markdown").retries,
             0,
         )
 
     def test_core_dependencies(self):
-        module = load_dag_module(
-            "batch_transaction_pipeline.py"
-        )
+        module = load_dag_module("batch_transaction_pipeline.py")
 
         dag = module.dag
 
@@ -158,15 +140,11 @@ class TestDagStructure(unittest.TestCase):
             )
 
     def test_ai_dependencies(self):
-        module = load_dag_module(
-            "ai_reporting_pipeline.py"
-        )
+        module = load_dag_module("ai_reporting_pipeline.py")
 
         dag = module.dag
 
-        create_summary = dag.get_task(
-            "create_ai_summary"
-        )
+        create_summary = dag.get_task("create_ai_summary")
 
         self.assertIn(
             "render_markdown",

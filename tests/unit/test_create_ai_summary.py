@@ -18,36 +18,19 @@ class TestCreateAiSummary(unittest.TestCase):
             {
                 "logical_date": "2026-01-01",
                 "overall_status": "warning",
-                "executive_summary": (
-                    "Der Batch wurde verarbeitet."
-                ),
+                "executive_summary": ("Der Batch wurde verarbeitet."),
                 "findings": [
                     {
-                        "rule_id": (
-                            "DQ001_REQUIRED_CUSTOMER_ID"
-                        ),
+                        "rule_id": ("DQ001_REQUIRED_CUSTOMER_ID"),
                         "severity": "high",
-                        "title": (
-                            "Fehlende Kundenzuordnung"
-                        ),
-                        "observation": (
-                            "DQ001 wurde verletzt."
-                        ),
-                        "business_impact": (
-                            "Ein Teil der Daten ist "
-                            "nicht zuordenbar."
-                        ),
-                        "recommended_action": (
-                            "Die Datenquelle prüfen."
-                        ),
+                        "title": ("Fehlende Kundenzuordnung"),
+                        "observation": ("DQ001 wurde verletzt."),
+                        "business_impact": ("Ein Teil der Daten ist nicht zuordenbar."),
+                        "recommended_action": ("Die Datenquelle prüfen."),
                     }
                 ],
-                "business_highlights": [
-                    "Die Approval-Rate war stabil."
-                ],
-                "recommended_actions": [
-                    "DQ001 untersuchen."
-                ],
+                "business_highlights": ["Die Approval-Rate war stabil."],
+                "recommended_actions": ["DQ001 untersuchen."],
             }
         )
 
@@ -66,9 +49,7 @@ class TestCreateAiSummary(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_and_validate_summary(
                 raw_content="not-json",
-                expected_logical_date=(
-                    "2026-01-01"
-                ),
+                expected_logical_date=("2026-01-01"),
             )
 
     def test_shortened_rule_id_is_rejected(self):
@@ -78,11 +59,7 @@ class TestCreateAiSummary(unittest.TestCase):
         )
 
         payload = {
-            "quality_report": {
-                "rule_failures": {
-                    "DQ001_REQUIRED_CUSTOMER_ID": 10
-                }
-            }
+            "quality_report": {"rule_failures": {"DQ001_REQUIRED_CUSTOMER_ID": 10}}
         }
 
         summary.findings[0].rule_id = "DQ001"
@@ -97,9 +74,7 @@ class TestCreateAiSummary(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_and_validate_summary(
                 raw_content=self.valid_response(),
-                expected_logical_date=(
-                    "2026-01-02"
-                ),
+                expected_logical_date=("2026-01-02"),
             )
 
     def test_summary_file_contains_metadata(self):
@@ -109,10 +84,7 @@ class TestCreateAiSummary(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp:
-            output_path = (
-                Path(temp)
-                / "ai_summary.json"
-            )
+            output_path = Path(temp) / "ai_summary.json"
 
             write_summary(
                 summary=summary,
@@ -125,11 +97,7 @@ class TestCreateAiSummary(unittest.TestCase):
                 },
             )
 
-            result = json.loads(
-                output_path.read_text(
-                    encoding="utf-8"
-                )
-            )
+            result = json.loads(output_path.read_text(encoding="utf-8"))
 
         self.assertEqual(
             result["provider"],

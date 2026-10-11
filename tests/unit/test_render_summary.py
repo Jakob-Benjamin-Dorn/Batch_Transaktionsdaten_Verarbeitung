@@ -14,9 +14,7 @@ from src.ai_summary.render_summary import (
 
 class TestRenderSummary(unittest.TestCase):
     def setUp(self):
-        self.template_dir = (
-            Path("/opt/airflow/src/ai_summary/templates")
-        )
+        self.template_dir = Path("/opt/airflow/src/ai_summary/templates")
 
         self.document = {
             "provider": "deepseek",
@@ -29,34 +27,23 @@ class TestRenderSummary(unittest.TestCase):
             "summary": {
                 "logical_date": "2026-01-01",
                 "overall_status": "warning",
-                "executive_summary": (
-                    "Der Batch wurde verarbeitet."
-                ),
+                "executive_summary": ("Der Batch wurde verarbeitet."),
                 "findings": [
                     {
-                        "rule_id": (
-                            "DQ001_REQUIRED_CUSTOMER_ID"
-                        ),
+                        "rule_id": ("DQ001_REQUIRED_CUSTOMER_ID"),
                         "severity": "high",
-                        "title": (
-                            "Fehlende Kundenzuordnung"
-                        ),
-                        "observation": (
-                            "50 Zeilen verletzen die Regel."
-                        ),
+                        "title": ("Fehlende Kundenzuordnung"),
+                        "observation": ("50 Zeilen verletzen die Regel."),
                         "business_impact": (
                             "Die betroffenen Datensätze "
                             "sind nicht eindeutig zuordenbar."
                         ),
                         "recommended_action": (
-                            "Die Ursache im Quellsystem "
-                            "untersuchen."
+                            "Die Ursache im Quellsystem untersuchen."
                         ),
                     }
                 ],
-                "business_highlights": [
-                    "Die Approval-Rate beträgt 92 Prozent."
-                ],
+                "business_highlights": ["Die Approval-Rate beträgt 92 Prozent."],
                 "recommended_actions": [
                     "Die häufigsten Regelverletzungen untersuchen."
                 ],
@@ -101,23 +88,16 @@ class TestRenderSummary(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp:
-            output_path = (
-                Path(temp)
-                / "ai_summary.md"
-            )
+            output_path = Path(temp) / "ai_summary.md"
 
             write_markdown(
                 markdown=markdown,
                 output_path=output_path,
             )
 
-            self.assertTrue(
-                output_path.is_file()
-            )
+            self.assertTrue(output_path.is_file())
 
-            content = output_path.read_text(
-                encoding="utf-8"
-            )
+            content = output_path.read_text(encoding="utf-8")
 
             self.assertEqual(
                 content,
@@ -126,10 +106,7 @@ class TestRenderSummary(unittest.TestCase):
 
     def test_summary_json_is_loaded_and_validated(self):
         with tempfile.TemporaryDirectory() as temp:
-            input_path = (
-                Path(temp)
-                / "ai_summary.json"
-            )
+            input_path = Path(temp) / "ai_summary.json"
 
             input_path.write_text(
                 json.dumps(
@@ -139,9 +116,7 @@ class TestRenderSummary(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = load_ai_summary(
-                input_path
-            )
+            result = load_ai_summary(input_path)
 
             self.assertEqual(
                 result["model"],
@@ -149,15 +124,10 @@ class TestRenderSummary(unittest.TestCase):
             )
 
     def test_missing_metadata_is_rejected(self):
-        invalid_document = {
-            "summary": self.document["summary"]
-        }
+        invalid_document = {"summary": self.document["summary"]}
 
         with tempfile.TemporaryDirectory() as temp:
-            input_path = (
-                Path(temp)
-                / "ai_summary.json"
-            )
+            input_path = Path(temp) / "ai_summary.json"
 
             input_path.write_text(
                 json.dumps(
@@ -167,9 +137,7 @@ class TestRenderSummary(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with self.assertRaises(
-                ValueError
-            ):
+            with self.assertRaises(ValueError):
                 load_ai_summary(input_path)
 
 

@@ -77,10 +77,7 @@ ALLOWED_CONTRACT_RULE_KEYS = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Prepare a privacy-safe, aggregated payload "
-            "for the AI summary."
-        )
+        description=("Prepare a privacy-safe, aggregated payload for the AI summary.")
     )
 
     parser.add_argument(
@@ -97,10 +94,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--contract-path",
-        default=(
-            "/opt/airflow/knowledge_base/"
-            "data_contract.json"
-        ),
+        default=("/opt/airflow/knowledge_base/data_contract.json"),
         help="Path to the data contract.",
     )
 
@@ -127,9 +121,7 @@ def report_directory(
 
 def load_json(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        raise FileNotFoundError(
-            f"Required JSON file does not exist: {path}"
-        )
+        raise FileNotFoundError(f"Required JSON file does not exist: {path}")
 
     with path.open(
         encoding="utf-8",
@@ -137,9 +129,7 @@ def load_json(path: Path) -> dict[str, Any]:
         value = json.load(file)
 
     if not isinstance(value, dict):
-        raise ValueError(
-            f"Expected a JSON object in {path}"
-        )
+        raise ValueError(f"Expected a JSON object in {path}")
 
     return value
 
@@ -148,11 +138,7 @@ def select_allowed_fields(
     source: dict[str, Any],
     allowed_fields: set[str],
 ) -> dict[str, Any]:
-    return {
-        key: source[key]
-        for key in allowed_fields
-        if key in source
-    }
+    return {key: source[key] for key in allowed_fields if key in source}
 
 
 def sanitize_quality_report(
@@ -177,24 +163,18 @@ def sanitize_country_summary(
     rows: Any,
 ) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
-        raise ValueError(
-            "country_currency_summary must be a list."
-        )
+        raise ValueError("country_currency_summary must be a list.")
 
     sanitized_rows = []
 
     for row in rows:
         if not isinstance(row, dict):
-            raise ValueError(
-                "Each country summary item must be an object."
-            )
+            raise ValueError("Each country summary item must be an object.")
 
         sanitized_rows.append(
             select_allowed_fields(
                 source=row,
-                allowed_fields=(
-                    ALLOWED_COUNTRY_SUMMARY_FIELDS
-                ),
+                allowed_fields=(ALLOWED_COUNTRY_SUMMARY_FIELDS),
             )
         )
 
@@ -211,20 +191,12 @@ def sanitize_business_metrics(
     )
 
     if not isinstance(daily_kpis, dict):
-        raise ValueError(
-            "daily_kpis must be a JSON object."
-        )
+        raise ValueError("daily_kpis must be a JSON object.")
 
     return {
         "logical_date": metrics.get("logical_date"),
-        "daily_kpis": sanitize_daily_kpis(
-            daily_kpis
-        ),
-        "country_currency_summary": (
-            sanitize_country_summary(
-                country_summary
-            )
-        ),
+        "daily_kpis": sanitize_daily_kpis(daily_kpis),
+        "country_currency_summary": (sanitize_country_summary(country_summary)),
     }
 
 
@@ -256,15 +228,9 @@ def sanitize_contract(
     ]
 
     return {
-        "contract_name": contract.get(
-            "contract_name"
-        ),
-        "contract_version": contract.get(
-            "contract_version"
-        ),
-        "description": contract.get(
-            "description"
-        ),
+        "contract_name": contract.get("contract_name"),
+        "contract_version": contract.get("contract_version"),
+        "description": contract.get("description"),
         "fields": sanitized_fields,
         "quality_rules": sanitized_rules,
     }
@@ -318,15 +284,9 @@ def build_ai_payload(
             "silver_contains_only_valid_rows": True,
             "amounts_are_not_converted_to_one_currency": True,
         },
-        "quality_report": sanitize_quality_report(
-            quality_report
-        ),
-        "business_metrics": sanitize_business_metrics(
-            business_metrics
-        ),
-        "data_contract": sanitize_contract(
-            contract
-        ),
+        "quality_report": sanitize_quality_report(quality_report),
+        "business_metrics": sanitize_business_metrics(business_metrics),
+        "data_contract": sanitize_contract(contract),
     }
 
     violations = find_forbidden_keys(payload)
@@ -334,10 +294,7 @@ def build_ai_payload(
     if violations:
         formatted = ", ".join(violations)
 
-        raise ValueError(
-            "Forbidden fields detected in AI payload: "
-            f"{formatted}"
-        )
+        raise ValueError(f"Forbidden fields detected in AI payload: {formatted}")
 
     return payload
 
@@ -372,17 +329,11 @@ def main() -> None:
         logical_date=args.logical_date,
     )
 
-    quality_report = load_json(
-        reports_dir / "quality_report.json"
-    )
+    quality_report = load_json(reports_dir / "quality_report.json")
 
-    business_metrics = load_json(
-        reports_dir / "business_metrics.json"
-    )
+    business_metrics = load_json(reports_dir / "business_metrics.json")
 
-    contract = load_json(
-        Path(args.contract_path)
-    )
+    contract = load_json(Path(args.contract_path))
 
     payload = build_ai_payload(
         quality_report=quality_report,
@@ -390,10 +341,7 @@ def main() -> None:
         contract=contract,
     )
 
-    output_path = (
-        reports_dir
-        / "ai_input_payload.json"
-    )
+    output_path = reports_dir / "ai_input_payload.json"
 
     write_payload(
         payload=payload,

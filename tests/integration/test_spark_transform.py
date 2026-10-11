@@ -17,8 +17,7 @@ class TestSparkTransformation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spark = (
-            SparkSession.builder
-            .appName("test-spark-transformation")
+            SparkSession.builder.appName("test-spark-transformation")
             .master("local[1]")
             .getOrCreate()
         )
@@ -52,7 +51,6 @@ class TestSparkTransformation(unittest.TestCase):
                 "MOBILE_APP ",
                 None,
             ),
-
             # Ungültig: customer_id fehlt und Currency ist ungültig
             (
                 "txn_invalid",
@@ -74,7 +72,6 @@ class TestSparkTransformation(unittest.TestCase):
                 "web_checkout",
                 None,
             ),
-
             # Älteres Duplikat
             (
                 "txn_duplicate",
@@ -96,7 +93,6 @@ class TestSparkTransformation(unittest.TestCase):
                 "payment_gateway_v1",
                 None,
             ),
-
             # Neueres Duplikat – diese Zeile darf in Silver bleiben
             (
                 "txn_duplicate",
@@ -156,11 +152,7 @@ class TestSparkTransformation(unittest.TestCase):
         self.assertNotIn("duplicate_rank", silver.columns)
 
         # Silver enthält echte, normalisierte Felder.
-        valid_row = (
-            silver
-            .filter(col("transaction_id") == "txn_valid")
-            .first()
-        )
+        valid_row = silver.filter(col("transaction_id") == "txn_valid").first()
 
         self.assertEqual(valid_row["currency"], "EUR")
         self.assertEqual(
@@ -171,21 +163,13 @@ class TestSparkTransformation(unittest.TestCase):
 
         # Silver darf keine doppelten transaction_id enthalten.
         duplicate_ids = (
-            silver
-            .groupBy("transaction_id")
-            .count()
-            .filter(col("count") > 1)
-            .count()
+            silver.groupBy("transaction_id").count().filter(col("count") > 1).count()
         )
 
         self.assertEqual(duplicate_ids, 0)
 
         # Die fachlich ungültige Zeile besitzt beide erwarteten Fehler.
-        invalid_row = (
-            quarantine
-            .filter(col("transaction_id") == "txn_invalid")
-            .first()
-        )
+        invalid_row = quarantine.filter(col("transaction_id") == "txn_invalid").first()
 
         self.assertIn(
             "DQ001_REQUIRED_CUSTOMER_ID",
@@ -197,16 +181,12 @@ class TestSparkTransformation(unittest.TestCase):
         )
 
         # Das ältere Duplikat wird explizit markiert.
-        duplicate_row = (
-            quarantine
-            .filter(
-                array_contains(
-                    col("dq_errors"),
-                    "DQ007_DUPLICATE_TRANSACTION",
-                )
+        duplicate_row = quarantine.filter(
+            array_contains(
+                col("dq_errors"),
+                "DQ007_DUPLICATE_TRANSACTION",
             )
-            .first()
-        )
+        ).first()
 
         self.assertIsNotNone(duplicate_row)
         self.assertEqual(

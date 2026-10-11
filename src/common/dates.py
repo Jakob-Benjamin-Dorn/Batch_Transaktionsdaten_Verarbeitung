@@ -10,6 +10,4 @@ def validate_logical_date(logical_date: str) -> None:
     try:
         datetime.strptime(logical_date, LOGICAL_DATE_FORMAT)
     except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use the format YYYY-MM-DD"
-        ) from exc
+        raise ValueError("--logical-date must use the format YYYY-MM-DD") from exc

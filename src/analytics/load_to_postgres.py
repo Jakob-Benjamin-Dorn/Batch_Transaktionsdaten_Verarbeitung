@@ -83,9 +83,7 @@ def metrics_path(data_dir: str, logical_date: str) -> Path:
 
 def read_metrics(path: Path, logical_date: str) -> dict[str, Any]:
     if not path.exists():
-        raise FileNotFoundError(
-            f"Business metrics do not exist: {path}"
-        )
+        raise FileNotFoundError(f"Business metrics do not exist: {path}")
 
     with path.open(encoding="utf-8") as file:
         metrics = json.load(file)
@@ -98,9 +96,7 @@ def read_metrics(path: Path, logical_date: str) -> dict[str, Any]:
         )
 
     if not metrics.get("daily_kpis"):
-        raise ValueError(
-            "business_metrics.json contains no daily_kpis."
-        )
+        raise ValueError("business_metrics.json contains no daily_kpis.")
 
     return metrics
 
@@ -112,9 +108,7 @@ def pick(
     missing = [name for name in columns if name not in row]
 
     if missing:
-        raise KeyError(
-            f"Missing columns in business metrics: {missing}"
-        )
+        raise KeyError(f"Missing columns in business metrics: {missing}")
 
     return {name: row[name] for name in columns}
 
@@ -126,10 +120,7 @@ def insert_statement(
     column_list = ", ".join(columns)
     placeholders = ", ".join(f"%({name})s" for name in columns)
 
-    return (
-        f"INSERT INTO {table} ({column_list}) "
-        f"VALUES ({placeholders})"
-    )
+    return f"INSERT INTO {table} ({column_list}) VALUES ({placeholders})"
 
 
 def apply_ddl(connection, sql_dir: Path) -> int:
@@ -167,8 +158,7 @@ def load_gold(
     try:
         with connection.cursor() as cursor:
             cursor.execute(
-                "DELETE FROM analytics.daily_kpis "
-                "WHERE logical_date = %s",
+                "DELETE FROM analytics.daily_kpis WHERE logical_date = %s",
                 (logical_date,),
             )
             cursor.execute(

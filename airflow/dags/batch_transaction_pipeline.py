@@ -12,10 +12,7 @@ DAG_ID = "batch_transaction_pipeline"
 
 DATA_DIR = "/opt/airflow/data"
 
-CONTRACT_PATH = (
-    "/opt/airflow/knowledge_base/"
-    "data_contract.json"
-)
+CONTRACT_PATH = "/opt/airflow/knowledge_base/data_contract.json"
 
 
 @dag(
@@ -174,9 +171,7 @@ def batch_transaction_pipeline():
     trigger_ai_report = TriggerDagRunOperator(
         task_id="trigger_ai_reporting_pipeline",
         trigger_dag_id="ai_reporting_pipeline",
-        trigger_run_id=(
-            "ai_report__{{ run_id }}"
-        ),
+        trigger_run_id=("ai_report__{{ run_id }}"),
         conf={
             "logical_date": "{{ ds }}",
             "source_dag_id": "{{ dag.dag_id }}",

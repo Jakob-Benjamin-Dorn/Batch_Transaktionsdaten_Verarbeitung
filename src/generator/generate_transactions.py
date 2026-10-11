@@ -16,6 +16,7 @@ from src.common.dates import validate_logical_date
 # Konfiguration
 # -----------------------------
 
+
 @dataclass
 class Config:
     seed: int = 42
@@ -38,11 +39,17 @@ class Config:
 
 
 COUNTRIES = {
-    "DE": {"currency": "EUR", "cities": ["Berlin", "Hamburg", "München", "Köln", "Frankfurt"]},
+    "DE": {
+        "currency": "EUR",
+        "cities": ["Berlin", "Hamburg", "München", "Köln", "Frankfurt"],
+    },
     "FR": {"currency": "EUR", "cities": ["Paris", "Lyon", "Marseille", "Toulouse"]},
     "NL": {"currency": "EUR", "cities": ["Amsterdam", "Rotterdam", "Utrecht"]},
     "GB": {"currency": "GBP", "cities": ["London", "Manchester", "Birmingham"]},
-    "US": {"currency": "USD", "cities": ["New York", "San Francisco", "Chicago", "Austin"]},
+    "US": {
+        "currency": "USD",
+        "cities": ["New York", "San Francisco", "Chicago", "Austin"],
+    },
     "PL": {"currency": "PLN", "cities": ["Warschau", "Krakau", "Gdansk"]},
 }
 
@@ -62,6 +69,7 @@ PAYMENT_METHODS = ["card", "paypal", "bank_transfer", "apple_pay", "google_pay"]
 # -----------------------------
 # Hilfsfunktionen
 # -----------------------------
+
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
@@ -98,6 +106,7 @@ def random_timestamp_for_day(day: datetime) -> datetime:
 # Stammdaten erzeugen
 # -----------------------------
 
+
 def generate_customers(cfg: Config) -> pd.DataFrame:
     rows = []
 
@@ -118,15 +127,18 @@ def generate_customers(cfg: Config) -> pd.DataFrame:
         age = int(np.random.normal(38, 12))
         age = max(18, min(age, 85))
 
-        rows.append({
-            "customer_id": random_id("cus"),
-            "home_country": country,
-            "home_city": city,
-            "preferred_currency": currency,
-            "risk_segment": risk_segment,
-            "age": age,
-            "created_at": datetime.fromisoformat(cfg.start_date) - timedelta(days=random.randint(1, 900)),
-        })
+        rows.append(
+            {
+                "customer_id": random_id("cus"),
+                "home_country": country,
+                "home_city": city,
+                "preferred_currency": currency,
+                "risk_segment": risk_segment,
+                "age": age,
+                "created_at": datetime.fromisoformat(cfg.start_date)
+                - timedelta(days=random.randint(1, 900)),
+            }
+        )
 
     return pd.DataFrame(rows)
 
@@ -141,15 +153,17 @@ def generate_merchants(cfg: Config) -> pd.DataFrame:
         country = random.choice(country_codes)
         category = random.choice(categories)
 
-        rows.append({
-            "merchant_id": random_id("mer"),
-            "merchant_name": f"{category}_{random.getrandbits(24):06x}",
-            "merchant_category": category,
-            "merchant_country": country,
-            "merchant_city": random.choice(COUNTRIES[country]["cities"]),
-            "merchant_currency": COUNTRIES[country]["currency"],
-            "base_risk": MERCHANT_CATEGORIES[category]["risk"],
-        })
+        rows.append(
+            {
+                "merchant_id": random_id("mer"),
+                "merchant_name": f"{category}_{random.getrandbits(24):06x}",
+                "merchant_category": category,
+                "merchant_country": country,
+                "merchant_city": random.choice(COUNTRIES[country]["cities"]),
+                "merchant_currency": COUNTRIES[country]["currency"],
+                "base_risk": MERCHANT_CATEGORIES[category]["risk"],
+            }
+        )
 
     return pd.DataFrame(rows)
 
@@ -165,13 +179,16 @@ def generate_devices(customers: pd.DataFrame) -> pd.DataFrame:
 
         for i in range(n_devices):
             device_type = weighted_choice(device_types, device_weights)
-            rows.append({
-                "device_id": random_id("dev"),
-                "customer_id": customer_id,
-                "device_type": device_type,
-                "is_primary_device": i == 0,
-                "device_created_at": datetime.fromisoformat("2025-01-01") + timedelta(days=random.randint(0, 365)),
-            })
+            rows.append(
+                {
+                    "device_id": random_id("dev"),
+                    "customer_id": customer_id,
+                    "device_type": device_type,
+                    "is_primary_device": i == 0,
+                    "device_created_at": datetime.fromisoformat("2025-01-01")
+                    + timedelta(days=random.randint(0, 365)),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -195,11 +212,13 @@ def generate_exchange_rates(cfg: Config) -> pd.DataFrame:
             noise = np.random.normal(0, 0.01)
             rate = base_rates_to_eur[currency] * (1 + noise)
 
-            rows.append({
-                "date": day.date().isoformat(),
-                "currency": currency,
-                "rate_to_eur": round(float(rate), 4),
-            })
+            rows.append(
+                {
+                    "date": day.date().isoformat(),
+                    "currency": currency,
+                    "rate_to_eur": round(float(rate), 4),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -207,6 +226,7 @@ def generate_exchange_rates(cfg: Config) -> pd.DataFrame:
 # -----------------------------
 # Transaktionslogik
 # -----------------------------
+
 
 def compute_fraud_probability(
     customer: pd.Series,
@@ -268,7 +288,9 @@ def generate_transactions(
         weekday = current_day.weekday()
         weekend_multiplier = 1.25 if weekday >= 5 else 1.0
 
-        n_transactions = int(np.random.poisson(cfg.avg_transactions_per_day * weekend_multiplier))
+        n_transactions = int(
+            np.random.poisson(cfg.avg_transactions_per_day * weekend_multiplier)
+        )
 
         for _ in range(n_transactions):
             customer_id = random.choice(customer_ids)
@@ -286,7 +308,9 @@ def generate_transactions(
                 currency = customer["preferred_currency"]
             else:
                 transaction_country = random.choice(list(COUNTRIES.keys()))
-                transaction_city = random.choice(COUNTRIES[transaction_country]["cities"])
+                transaction_city = random.choice(
+                    COUNTRIES[transaction_country]["cities"]
+                )
                 currency = COUNTRIES[transaction_country]["currency"]
 
             amount = positive_normal(
@@ -339,7 +363,9 @@ def generate_transactions(
 
             # ingestion_time kann verspätet sein
             if random.random() < cfg.late_arrival_rate:
-                ingestion_time = event_time + timedelta(days=random.randint(1, 4), minutes=random.randint(0, 180))
+                ingestion_time = event_time + timedelta(
+                    days=random.randint(1, 4), minutes=random.randint(0, 180)
+                )
                 is_late_arriving = True
             else:
                 ingestion_time = event_time + timedelta(minutes=random.randint(1, 90))
@@ -363,15 +389,18 @@ def generate_transactions(
                 "is_fraud": is_fraud,
                 "is_late_arriving": is_late_arriving,
                 "source_system": weighted_choice(
-                    ["payment_gateway_v1", "payment_gateway_v2", "mobile_app", "web_checkout"],
+                    [
+                        "payment_gateway_v1",
+                        "payment_gateway_v2",
+                        "mobile_app",
+                        "web_checkout",
+                    ],
                     [0.40, 0.25, 0.20, 0.15],
                 ),
             }
 
             # Simulierte Schema-Drift: ab Tag 20 taucht ein neues Feld auf
-            schema_drift_start = datetime.fromisoformat(
-                cfg.schema_drift_start_date
-            )
+            schema_drift_start = datetime.fromisoformat(cfg.schema_drift_start_date)
 
             if current_day >= schema_drift_start:
                 row["device_trust_score"] = round(
@@ -407,19 +436,26 @@ def generate_chargebacks(transactions: pd.DataFrame) -> pd.DataFrame:
 
         if random.random() < base_prob:
             event_time = txn["event_time"] + timedelta(days=random.randint(3, 25))
-            rows.append({
-                "chargeback_id": random_id("cbk"),
-                "original_transaction_id": txn["transaction_id"],
-                "customer_id": txn["customer_id"],
-                "merchant_id": txn["merchant_id"],
-                "chargeback_time": event_time,
-                "chargeback_amount": txn["amount"],
-                "currency": txn["currency"],
-                "reason_code": weighted_choice(
-                    ["fraud", "product_not_received", "duplicate_charge", "customer_dispute"],
-                    [0.45, 0.25, 0.15, 0.15],
-                ),
-            })
+            rows.append(
+                {
+                    "chargeback_id": random_id("cbk"),
+                    "original_transaction_id": txn["transaction_id"],
+                    "customer_id": txn["customer_id"],
+                    "merchant_id": txn["merchant_id"],
+                    "chargeback_time": event_time,
+                    "chargeback_amount": txn["amount"],
+                    "currency": txn["currency"],
+                    "reason_code": weighted_choice(
+                        [
+                            "fraud",
+                            "product_not_received",
+                            "duplicate_charge",
+                            "customer_dispute",
+                        ],
+                        [0.45, 0.25, 0.15, 0.15],
+                    ),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -427,6 +463,7 @@ def generate_chargebacks(transactions: pd.DataFrame) -> pd.DataFrame:
 # -----------------------------
 # Dirty Data erzeugen
 # -----------------------------
+
 
 def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.DataFrame:
     dirty = transactions.copy()
@@ -441,7 +478,9 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
     duplicate_rows = dirty.sample(n=n_duplicates, random_state=cfg.seed).copy()
 
     # Leicht andere ingestion_time, aber gleiche transaction_id
-    duplicate_rows["ingestion_time"] = duplicate_rows["ingestion_time"] + pd.to_timedelta(
+    duplicate_rows["ingestion_time"] = duplicate_rows[
+        "ingestion_time"
+    ] + pd.to_timedelta(
         np.random.randint(1, 360, size=n_duplicates),
         unit="m",
     )
@@ -467,10 +506,11 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
     dirty.loc[idx, "event_time"] = "not-a-timestamp"
 
     # 5. Negative Beträge ohne Refund-Flag
-    idx = dirty[
-        (dirty["amount"] > 0)
-        & (dirty["transaction_type"] == "purchase")
-    ].sample(frac=cfg.negative_amount_error_rate, random_state=cfg.seed + 4).index
+    idx = (
+        dirty[(dirty["amount"] > 0) & (dirty["transaction_type"] == "purchase")]
+        .sample(frac=cfg.negative_amount_error_rate, random_state=cfg.seed + 4)
+        .index
+    )
 
     dirty.loc[idx, "amount"] = dirty.loc[idx, "amount"] * -1
     dirty.loc[idx, "is_refund"] = False
@@ -481,7 +521,9 @@ def inject_data_quality_issues(cfg: Config, transactions: pd.DataFrame) -> pd.Da
 
     # 7. Whitespace / uneinheitliche Source-Systeme
     idx = dirty.sample(frac=0.01, random_state=cfg.seed + 6).index
-    dirty.loc[idx, "source_system"] = dirty.loc[idx, "source_system"].astype(str).str.upper() + " "
+    dirty.loc[idx, "source_system"] = (
+        dirty.loc[idx, "source_system"].astype(str).str.upper() + " "
+    )
 
     return dirty.sample(frac=1.0, random_state=cfg.seed).reset_index(drop=True)
 

@@ -18,8 +18,7 @@ class TestDataQualityRules(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spark = (
-            SparkSession.builder
-            .appName("test-data-quality")
+            SparkSession.builder.appName("test-data-quality")
             .master("local[1]")
             .getOrCreate()
         )
@@ -208,9 +207,7 @@ class TestDataQualityRules(unittest.TestCase):
             ]
         )
 
-        rows = dataframe.orderBy(
-            "ingestion_time_parsed"
-        ).collect()
+        rows = dataframe.orderBy("ingestion_time_parsed").collect()
 
         self.assertIn(
             "DQ007_DUPLICATE_TRANSACTION",

@@ -86,8 +86,7 @@ class TestLoadToPostgres(unittest.TestCase):
 
         self.assertEqual(
             str(path),
-            "/data/reports/year=2026/month=01/day=02/"
-            "business_metrics.json",
+            "/data/reports/year=2026/month=01/day=02/business_metrics.json",
         )
 
     def test_insert_statement_uses_named_placeholders(self):
@@ -148,14 +147,10 @@ class TestLoadToPostgres(unittest.TestCase):
         self.assertTrue(statements[0].startswith("DELETE FROM analytics.daily_kpis"))
         self.assertTrue(statements[1].startswith("INSERT INTO analytics.daily_kpis"))
         self.assertTrue(
-            statements[2].startswith(
-                "DELETE FROM analytics.country_currency_summary"
-            )
+            statements[2].startswith("DELETE FROM analytics.country_currency_summary")
         )
         self.assertTrue(
-            statements[3].startswith(
-                "INSERT INTO analytics.country_currency_summary"
-            )
+            statements[3].startswith("INSERT INTO analytics.country_currency_summary")
         )
 
         country_call = connection.calls[3]
@@ -175,9 +170,7 @@ class TestLoadToPostgres(unittest.TestCase):
             load_gold(connection, metrics, "2026-01-01"),
             (1, 0),
         )
-        self.assertFalse(
-            any(call[0] == "executemany" for call in connection.calls)
-        )
+        self.assertFalse(any(call[0] == "executemany" for call in connection.calls))
 
     def test_load_gold_rolls_back_on_error(self):
         connection = FakeConnection(

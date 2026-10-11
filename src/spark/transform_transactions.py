@@ -80,11 +80,7 @@ def read_bronze(
     spark: SparkSession,
     input_path: str,
 ) -> DataFrame:
-    return (
-        spark.read
-        .schema(TRANSACTION_BRONZE_SCHEMA)
-        .json(input_path)
-    )
+    return spark.read.schema(TRANSACTION_BRONZE_SCHEMA).json(input_path)
 
 
 def prepare_transactions(
@@ -92,8 +88,7 @@ def prepare_transactions(
     logical_date: str,
 ) -> DataFrame:
     prepared = (
-        transactions
-        .withColumn(
+        transactions.withColumn(
             "customer_id",
             trim(col("customer_id")),
         )
@@ -119,55 +114,51 @@ def prepare_transactions(
         )
     )
 
-    return (
-        prepared
-        .withColumn(
-            "dq_errors",
-            array_compact(
-                array(
-                    when(
-                        missing_customer_id(),
-                        lit("DQ001_REQUIRED_CUSTOMER_ID"),
-                    ),
-                    when(
-                        invalid_currency(),
-                        lit("DQ002_INVALID_CURRENCY"),
-                    ),
-                    when(
-                        invalid_event_time(),
-                        lit("DQ003_INVALID_EVENT_TIME"),
-                    ),
-                    when(
-                        event_time_in_future(logical_date),
-                        lit("DQ004_EVENT_TIME_IN_FUTURE"),
-                    ),
-                    when(
-                        invalid_purchase_amount(),
-                        lit("DQ005_INVALID_PURCHASE_AMOUNT"),
-                    ),
-                    when(
-                        invalid_refund(),
-                        lit("DQ006_INVALID_REFUND"),
-                    ),
-                    when(
-                        invalid_source_system(),
-                        lit("DQ008_INVALID_SOURCE_SYSTEM"),
-                    ),
-                    when(
-                        missing_transaction_id(),
-                        lit("DQ009_REQUIRED_TRANSACTION_ID"),
-                    ),
-                    when(
-                        invalid_ingestion_time(),
-                        lit("DQ010_INVALID_INGESTION_TIME"),
-                    ),
-                )
-            ),
-        )
-        .withColumn(
-            "is_valid",
-            size(col("dq_errors")) == 0,
-        )
+    return prepared.withColumn(
+        "dq_errors",
+        array_compact(
+            array(
+                when(
+                    missing_customer_id(),
+                    lit("DQ001_REQUIRED_CUSTOMER_ID"),
+                ),
+                when(
+                    invalid_currency(),
+                    lit("DQ002_INVALID_CURRENCY"),
+                ),
+                when(
+                    invalid_event_time(),
+                    lit("DQ003_INVALID_EVENT_TIME"),
+                ),
+                when(
+                    event_time_in_future(logical_date),
+                    lit("DQ004_EVENT_TIME_IN_FUTURE"),
+                ),
+                when(
+                    invalid_purchase_amount(),
+                    lit("DQ005_INVALID_PURCHASE_AMOUNT"),
+                ),
+                when(
+                    invalid_refund(),
+                    lit("DQ006_INVALID_REFUND"),
+                ),
+                when(
+                    invalid_source_system(),
+                    lit("DQ008_INVALID_SOURCE_SYSTEM"),
+                ),
+                when(
+                    missing_transaction_id(),
+                    lit("DQ009_REQUIRED_TRANSACTION_ID"),
+                ),
+                when(
+                    invalid_ingestion_time(),
+                    lit("DQ010_INVALID_INGESTION_TIME"),
+                ),
+            )
+        ),
+    ).withColumn(
+        "is_valid",
+        size(col("dq_errors")) == 0,
     )
 
 
@@ -175,8 +166,7 @@ def split_by_quality(
     prepared: DataFrame,
 ) -> tuple[DataFrame, DataFrame]:
     silver = (
-        prepared
-        .filter(col("is_valid"))
+        prepared.filter(col("is_valid"))
         .drop(
             "event_time",
             "ingestion_time",
@@ -239,19 +229,11 @@ def create_quality_report(
             )
         ).count()
 
-    validity_rate = (
-        valid_rows / input_rows
-        if input_rows > 0
-        else 0.0
-    )
+    validity_rate = valid_rows / input_rows if input_rows > 0 else 0.0
 
     return {
         "logical_date": logical_date,
-        "status": (
-            "passed"
-            if quarantined_rows == 0
-            else "warning"
-        ),
+        "status": ("passed" if quarantined_rows == 0 else "warning"),
         "input_rows": input_rows,
         "valid_rows": valid_rows,
         "quarantined_rows": quarantined_rows,
@@ -321,15 +303,10 @@ def main() -> None:
     )
 
     if not Path(bronze_path).is_file():
-        raise FileNotFoundError(
-            f"Bronze batch does not exist: {bronze_path}"
-        )
+        raise FileNotFoundError(f"Bronze batch does not exist: {bronze_path}")
 
     spark = (
-        SparkSession.builder
-        .appName(
-            f"transform-transactions-{args.logical_date}"
-        )
+        SparkSession.builder.appName(f"transform-transactions-{args.logical_date}")
         .master("local[2]")
         .getOrCreate()
     )
@@ -353,17 +330,9 @@ def main() -> None:
         valid_rows = silver.count()
         quarantined_rows = quarantine.count()
 
-        (
-            silver.write
-            .mode("overwrite")
-            .parquet(silver_path)
-        )
+        (silver.write.mode("overwrite").parquet(silver_path))
 
-        (
-            quarantine.write
-            .mode("overwrite")
-            .parquet(quarantine_path)
-        )
+        (quarantine.write.mode("overwrite").parquet(quarantine_path))
 
         report = create_quality_report(
             input_rows=input_rows,

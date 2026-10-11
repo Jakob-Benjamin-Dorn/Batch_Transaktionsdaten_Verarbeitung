@@ -26,9 +26,7 @@ class QualityFinding(BaseModel):
 
     rule_id: str = Field(
         min_length=1,
-        description=(
-            "Identifier of the referenced data-quality rule."
-        ),
+        description=("Identifier of the referenced data-quality rule."),
     )
 
     severity: Severity
