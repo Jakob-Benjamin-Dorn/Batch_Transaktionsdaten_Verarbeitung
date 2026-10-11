@@ -8,7 +8,6 @@ from pyspark.sql.types import (
     StructType,
 )
 
-
 TRANSACTION_BRONZE_SCHEMA = StructType(
     [
         StructField("transaction_id", StringType(), True),

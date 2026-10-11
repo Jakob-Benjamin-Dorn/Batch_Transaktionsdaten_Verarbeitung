@@ -9,7 +9,6 @@ from typing import Any
 
 from src.common.dates import validate_logical_date
 
-
 DAILY_KPI_COLUMNS = (
     "logical_date",
     "total_transactions",

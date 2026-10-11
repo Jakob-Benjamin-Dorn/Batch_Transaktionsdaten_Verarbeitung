@@ -3,12 +3,10 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pendulum
-
 from airflow.providers.standard.operators.trigger_dagrun import (
     TriggerDagRunOperator,
 )
 from airflow.sdk import dag, task
-
 
 DAG_ID = "batch_transaction_pipeline"
 

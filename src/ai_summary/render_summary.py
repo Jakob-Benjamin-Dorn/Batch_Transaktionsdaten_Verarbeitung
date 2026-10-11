@@ -6,10 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment
-from jinja2 import FileSystemLoader
-from jinja2 import StrictUndefined
-from jinja2 import select_autoescape
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from src.ai_summary.models import AiBatchSummary
 from src.common.dates import validate_logical_date

@@ -13,7 +13,6 @@ from pyspark.sql.functions import (
     when,
 )
 
-
 ALLOWED_CURRENCIES = ["EUR", "USD", "GBP", "PLN"]
 
 ALLOWED_SOURCE_SYSTEMS = [

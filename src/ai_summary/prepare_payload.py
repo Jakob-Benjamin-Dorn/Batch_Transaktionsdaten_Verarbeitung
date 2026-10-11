@@ -8,7 +8,6 @@ from typing import Any
 
 from src.common.dates import validate_logical_date
 
-
 ALLOWED_QUALITY_REPORT_FIELDS = {
     "logical_date",
     "status",

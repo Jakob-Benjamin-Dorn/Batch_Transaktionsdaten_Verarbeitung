@@ -20,6 +20,7 @@ from pyspark.sql.functions import (
     when,
 )
 
+from src.common.dates import validate_logical_date
 from src.spark.data_quality import (
     event_time_in_future,
     invalid_currency,
@@ -33,7 +34,6 @@ from src.spark.data_quality import (
     missing_transaction_id,
 )
 from src.spark.schemas import TRANSACTION_BRONZE_SCHEMA
-from src.common.dates import validate_logical_date
 
 
 def parse_args() -> argparse.Namespace:

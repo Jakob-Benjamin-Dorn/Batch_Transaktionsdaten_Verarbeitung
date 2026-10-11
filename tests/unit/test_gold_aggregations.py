@@ -17,7 +17,6 @@ from src.spark.build_gold import (
     build_daily_kpis,
 )
 
-
 SILVER_TEST_SCHEMA = StructType(
     [
         StructField(

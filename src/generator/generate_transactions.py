@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+import argparse
+import hashlib
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-import argparse
-import hashlib
+
 import numpy as np
 import pandas as pd
 
 from src.common.dates import validate_logical_date
-
 
 # -----------------------------
 # Konfiguration
@@ -70,7 +70,7 @@ def set_seed(seed: int) -> None:
 
 def seed_from_date(logical_date: str, base_seed: int = 42) -> int:
     """Erzeugt für jedes Datum einen stabilen, reproduzierbaren Seed."""
-    value = f"{logical_date}:{base_seed}".encode("utf-8")
+    value = f"{logical_date}:{base_seed}".encode()
     digest = hashlib.sha256(value).hexdigest()
     return int(digest[:8], 16)
 

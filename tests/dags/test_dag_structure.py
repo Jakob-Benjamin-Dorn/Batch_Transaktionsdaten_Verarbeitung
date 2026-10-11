@@ -4,7 +4,6 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-
 DAG_DIR = Path("/opt/airflow/dags")
 
 

@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from airflow.sdk import dag, task
 
-
 DAG_ID = "ai_reporting_pipeline"
 
 DATA_DIR = "/opt/airflow/data"

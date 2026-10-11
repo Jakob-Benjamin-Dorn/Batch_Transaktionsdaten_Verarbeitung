@@ -121,12 +121,14 @@ class TestLoadToPostgres(unittest.TestCase):
                 read_metrics(path, "2026-01-02")
 
     def test_read_metrics_requires_existing_file(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(FileNotFoundError):
-                read_metrics(
-                    Path(directory) / "missing.json",
-                    "2026-01-01",
-                )
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            self.assertRaises(FileNotFoundError),
+        ):
+            read_metrics(
+                Path(directory) / "missing.json",
+                "2026-01-01",
+            )
 
     def test_load_gold_replaces_the_day_in_one_transaction(self):
         connection = FakeConnection()
@@ -215,9 +217,11 @@ class TestLoadToPostgres(unittest.TestCase):
             self.assertEqual(connection.commits, 1)
 
     def test_apply_ddl_requires_scripts(self):
-        with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(FileNotFoundError):
-                apply_ddl(FakeConnection(), Path(directory))
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            self.assertRaises(FileNotFoundError),
+        ):
+            apply_ddl(FakeConnection(), Path(directory))
 
 
 if __name__ == "__main__":

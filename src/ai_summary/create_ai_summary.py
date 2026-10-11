@@ -7,9 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from openai import APIConnectionError
-from openai import APIStatusError
-from openai import OpenAI
+from openai import APIConnectionError, APIStatusError, OpenAI
 from pydantic import ValidationError
 
 from src.ai_summary.models import AiBatchSummary
@@ -18,7 +16,6 @@ from src.ai_summary.prompts import (
     build_user_prompt,
 )
 from src.common.dates import validate_logical_date
-
 
 DEFAULT_MODEL = "deepseek-v4-flash"
 DEFAULT_BASE_URL = "https://api.deepseek.com"
