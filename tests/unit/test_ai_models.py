@@ -19,16 +19,11 @@ class TestAiModels(unittest.TestCase):
             ),
             "findings": [
                 {
-                    "rule_id": (
-                        "DQ001_REQUIRED_CUSTOMER_ID"
-                    ),
+                    "rule_id": ("DQ001_REQUIRED_CUSTOMER_ID"),
                     "severity": "high",
-                    "title": (
-                        "Fehlende Kundenzuordnung"
-                    ),
+                    "title": ("Fehlende Kundenzuordnung"),
                     "observation": (
-                        "Ein Teil der Transaktionen "
-                        "enthielt keine customer_id."
+                        "Ein Teil der Transaktionen enthielt keine customer_id."
                     ),
                     "business_impact": (
                         "Diese Transaktionen können nicht "
@@ -36,23 +31,16 @@ class TestAiModels(unittest.TestCase):
                         "werden."
                     ),
                     "recommended_action": (
-                        "Die Kundenreferenzen im "
-                        "Quellsystem prüfen."
+                        "Die Kundenreferenzen im Quellsystem prüfen."
                     ),
                 }
             ],
-            "business_highlights": [
-                "Die Approval-Rate lag bei 92 Prozent."
-            ],
-            "recommended_actions": [
-                "Die häufigsten DQ-Regeln untersuchen."
-            ],
+            "business_highlights": ["Die Approval-Rate lag bei 92 Prozent."],
+            "recommended_actions": ["Die häufigsten DQ-Regeln untersuchen."],
         }
 
     def test_valid_summary_is_accepted(self):
-        summary = AiBatchSummary.model_validate(
-            self.valid_summary()
-        )
+        summary = AiBatchSummary.model_validate(self.valid_summary())
 
         self.assertEqual(
             summary.overall_status,
@@ -68,36 +56,28 @@ class TestAiModels(unittest.TestCase):
         value = self.valid_summary()
         value["overall_status"] = "maybe"
 
-        with self.assertRaises(
-            ValidationError
-        ):
+        with self.assertRaises(ValidationError):
             AiBatchSummary.model_validate(value)
 
     def test_missing_required_field_is_rejected(self):
         value = self.valid_summary()
         del value["executive_summary"]
 
-        with self.assertRaises(
-            ValidationError
-        ):
+        with self.assertRaises(ValidationError):
             AiBatchSummary.model_validate(value)
 
     def test_unknown_field_is_rejected(self):
         value = self.valid_summary()
         value["unexpected_field"] = "not allowed"
 
-        with self.assertRaises(
-            ValidationError
-        ):
+        with self.assertRaises(ValidationError):
             AiBatchSummary.model_validate(value)
 
     def test_invalid_finding_severity_is_rejected(self):
         value = self.valid_summary()
         value["findings"][0]["severity"] = "extreme"
 
-        with self.assertRaises(
-            ValidationError
-        ):
+        with self.assertRaises(ValidationError):
             AiBatchSummary.model_validate(value)
 
 

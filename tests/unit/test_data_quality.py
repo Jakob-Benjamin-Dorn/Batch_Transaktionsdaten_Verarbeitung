@@ -5,21 +5,20 @@ import unittest
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StringType, StructField, StructType
 
-from src.spark.transform_transactions import prepare_transactions
 from src.spark.data_quality import (
     invalid_ingestion_time,
     mark_duplicate_transactions,
     missing_transaction_id,
 )
 from src.spark.schemas import TRANSACTION_BRONZE_SCHEMA
+from src.spark.transform_transactions import prepare_transactions
 
 
 class TestDataQualityRules(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spark = (
-            SparkSession.builder
-            .appName("test-data-quality")
+            SparkSession.builder.appName("test-data-quality")
             .master("local[1]")
             .getOrCreate()
         )
@@ -208,9 +207,7 @@ class TestDataQualityRules(unittest.TestCase):
             ]
         )
 
-        rows = dataframe.orderBy(
-            "ingestion_time_parsed"
-        ).collect()
+        rows = dataframe.orderBy("ingestion_time_parsed").collect()
 
         self.assertIn(
             "DQ007_DUPLICATE_TRANSACTION",

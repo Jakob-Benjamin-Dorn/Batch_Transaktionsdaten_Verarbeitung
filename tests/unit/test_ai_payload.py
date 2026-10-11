@@ -47,9 +47,7 @@ class TestAiPayload(unittest.TestCase):
         }
 
         self.contract = {
-            "contract_name": (
-                "transaction_bronze_contract"
-            ),
+            "contract_name": ("transaction_bronze_contract"),
             "contract_version": "1.0.0",
             "description": "Test contract",
             "fields": [
@@ -69,9 +67,7 @@ class TestAiPayload(unittest.TestCase):
                 {
                     "rule_id": "DQ002",
                     "name": "valid_currency",
-                    "description": (
-                        "Currency must be allowed."
-                    ),
+                    "description": ("Currency must be allowed."),
                     "severity": "medium",
                     "internal_owner": "secret-team",
                 }
@@ -97,14 +93,10 @@ class TestAiPayload(unittest.TestCase):
 
         self.assertNotIn(
             "transaction_id",
-            payload[
-                "business_metrics"
-            ]["daily_kpis"],
+            payload["business_metrics"]["daily_kpis"],
         )
 
-        first_country = payload[
-            "business_metrics"
-        ]["country_currency_summary"][0]
+        first_country = payload["business_metrics"]["country_currency_summary"][0]
 
         self.assertNotIn(
             "customer_id",
@@ -119,35 +111,23 @@ class TestAiPayload(unittest.TestCase):
         )
 
         self.assertEqual(
-            payload[
-                "quality_report"
-            ]["input_rows"],
+            payload["quality_report"]["input_rows"],
             100,
         )
 
         self.assertEqual(
-            payload[
-                "business_metrics"
-            ]["daily_kpis"][
-                "total_transactions"
-            ],
+            payload["business_metrics"]["daily_kpis"]["total_transactions"],
             90,
         )
 
         self.assertEqual(
-            payload[
-                "business_metrics"
-            ][
-                "country_currency_summary"
-            ][0]["transaction_country"],
+            payload["business_metrics"]["country_currency_summary"][0][
+                "transaction_country"
+            ],
             "DE",
         )
 
-        self.assertTrue(
-            payload["pipeline_capabilities"][
-                "duplicates_are_detected"
-            ]
-        )
+        self.assertTrue(payload["pipeline_capabilities"]["duplicates_are_detected"])
 
         self.assertTrue(
             payload["pipeline_capabilities"][
@@ -155,30 +135,14 @@ class TestAiPayload(unittest.TestCase):
             ]
         )
 
-
     def test_forbidden_key_detection_is_recursive(self):
-        unsafe_payload = {
-            "safe": {
-                "nested": [
-                    {
-                        "customer_id": "cus_123"
-                    }
-                ]
-            }
-        }
+        unsafe_payload = {"safe": {"nested": [{"customer_id": "cus_123"}]}}
 
-        violations = find_forbidden_keys(
-            unsafe_payload
-        )
+        violations = find_forbidden_keys(unsafe_payload)
 
         self.assertEqual(
             violations,
-            [
-                (
-                    "payload.safe.nested[0]"
-                    ".customer_id"
-                )
-            ],
+            [("payload.safe.nested[0].customer_id")],
         )
 
 

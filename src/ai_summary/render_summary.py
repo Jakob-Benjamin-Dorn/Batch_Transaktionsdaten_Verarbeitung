@@ -6,20 +6,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment
-from jinja2 import FileSystemLoader
-from jinja2 import StrictUndefined
-from jinja2 import select_autoescape
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from src.ai_summary.models import AiBatchSummary
+from src.common.dates import validate_logical_date
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Render the validated AI summary JSON "
-            "as deterministic Markdown."
-        )
+        description=("Render the validated AI summary JSON as deterministic Markdown.")
     )
 
     parser.add_argument(
@@ -36,27 +31,11 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--template-dir",
-        default=(
-            "/opt/airflow/src/ai_summary/templates"
-        ),
+        default=("/opt/airflow/src/ai_summary/templates"),
         help="Directory containing Jinja2 templates.",
     )
 
     return parser.parse_args()
-
-
-def validate_logical_date(
-    logical_date: str,
-) -> None:
-    try:
-        datetime.strptime(
-            logical_date,
-            "%Y-%m-%d",
-        )
-    except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use the format YYYY-MM-DD"
-        ) from exc
 
 
 def report_directory(
@@ -81,9 +60,7 @@ def load_ai_summary(
     path: Path,
 ) -> dict[str, Any]:
     if not path.is_file():
-        raise FileNotFoundError(
-            f"AI summary file does not exist: {path}"
-        )
+        raise FileNotFoundError(f"AI summary file does not exist: {path}")
 
     with path.open(
         encoding="utf-8",
@@ -91,9 +68,7 @@ def load_ai_summary(
         value = json.load(file)
 
     if not isinstance(value, dict):
-        raise ValueError(
-            "AI summary file must contain a JSON object."
-        )
+        raise ValueError("AI summary file must contain a JSON object.")
 
     required_fields = {
         "provider",
@@ -106,18 +81,13 @@ def load_ai_summary(
 
     if missing_fields:
         raise ValueError(
-            "AI summary file is missing fields: "
-            + ", ".join(sorted(missing_fields))
+            "AI summary file is missing fields: " + ", ".join(sorted(missing_fields))
         )
 
     if not isinstance(value["usage"], dict):
-        raise ValueError(
-            "usage must be a JSON object."
-        )
+        raise ValueError("usage must be a JSON object.")
 
-    AiBatchSummary.model_validate(
-        value["summary"]
-    )
+    AiBatchSummary.model_validate(value["summary"])
 
     return value
 
@@ -126,15 +96,10 @@ def create_environment(
     template_dir: Path,
 ) -> Environment:
     if not template_dir.is_dir():
-        raise FileNotFoundError(
-            f"Template directory does not exist: "
-            f"{template_dir}"
-        )
+        raise FileNotFoundError(f"Template directory does not exist: {template_dir}")
 
     return Environment(
-        loader=FileSystemLoader(
-            str(template_dir)
-        ),
+        loader=FileSystemLoader(str(template_dir)),
         undefined=StrictUndefined,
         autoescape=select_autoescape(
             enabled_extensions=(),
@@ -150,24 +115,21 @@ def render_markdown(
     document: dict[str, Any],
     template_dir: Path,
 ) -> str:
-    summary = AiBatchSummary.model_validate(
-        document["summary"]
-    )
+    summary = AiBatchSummary.model_validate(document["summary"])
 
-    environment = create_environment(
-        template_dir
-    )
+    environment = create_environment(template_dir)
 
-    template = environment.get_template(
-        "summary.md.j2"
-    )
+    template = environment.get_template("summary.md.j2")
 
-    return template.render(
-        provider=document["provider"],
-        model=document["model"],
-        usage=document["usage"],
-        summary=summary.model_dump(),
-    ).strip() + "\n"
+    return (
+        template.render(
+            provider=document["provider"],
+            model=document["model"],
+            usage=document["usage"],
+            summary=summary.model_dump(),
+        ).strip()
+        + "\n"
+    )
 
 
 def write_markdown(
@@ -197,9 +159,7 @@ def main() -> None:
     input_path = reports_dir / "ai_summary.json"
     output_path = reports_dir / "ai_summary.md"
 
-    document = load_ai_summary(
-        input_path
-    )
+    document = load_ai_summary(input_path)
 
     markdown = render_markdown(
         document=document,

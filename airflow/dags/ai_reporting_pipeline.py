@@ -4,7 +4,6 @@ from datetime import timedelta
 
 from airflow.sdk import dag, task
 
-
 DAG_ID = "ai_reporting_pipeline"
 
 DATA_DIR = "/opt/airflow/data"
@@ -65,9 +64,7 @@ def ai_reporting_pipeline():
 
     # Der Core-DAG übergibt das Datum über dag_run.conf.
     # Bei einem manuellen Test ohne conf verwenden wir {{ ds }}.
-    logical_date = (
-        "{{ dag_run.conf.get('logical_date', ds) }}"
-    )
+    logical_date = "{{ dag_run.conf.get('logical_date', ds) }}"
 
     create_summary_task = create_ai_summary(
         logical_date=logical_date,

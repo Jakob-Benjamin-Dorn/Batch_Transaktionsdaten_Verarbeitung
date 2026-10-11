@@ -11,10 +11,16 @@ from pyspark.sql.functions import (
     col,
     count,
     lit,
-    round as spark_round,
-    sum as spark_sum,
     when,
 )
+from pyspark.sql.functions import (
+    round as spark_round,
+)
+from pyspark.sql.functions import (
+    sum as spark_sum,
+)
+
+from src.common.dates import validate_logical_date
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,15 +44,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def validate_logical_date(logical_date: str) -> None:
-    try:
-        datetime.strptime(logical_date, "%Y-%m-%d")
-    except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use the format YYYY-MM-DD"
-        ) from exc
 
 
 def partition_path(
@@ -93,79 +90,67 @@ def build_daily_kpis(
     logical_date: str,
 ) -> DataFrame:
     approved_purchase_amount = when(
-        (col("status") == "approved")
-        & (col("transaction_type") == "purchase"),
+        (col("status") == "approved") & (col("transaction_type") == "purchase"),
         col("amount"),
     ).otherwise(lit(0.0))
 
     approved_refund_amount = when(
-        (col("status") == "approved")
-        & (col("transaction_type") == "refund"),
+        (col("status") == "approved") & (col("transaction_type") == "refund"),
         col("amount"),
     ).otherwise(lit(0.0))
 
     metrics = silver.agg(
         count("*").alias("total_transactions"),
-
         spark_sum(
             when(
                 col("status") == "approved",
                 1,
             ).otherwise(0)
         ).alias("approved_transactions"),
-
         spark_sum(
             when(
                 col("status") == "declined",
                 1,
             ).otherwise(0)
         ).alias("declined_transactions"),
-
         spark_sum(
             when(
                 col("status") == "pending",
                 1,
             ).otherwise(0)
         ).alias("pending_transactions"),
-
         spark_sum(
             when(
                 col("transaction_type") == "purchase",
                 1,
             ).otherwise(0)
         ).alias("purchase_transactions"),
-
         spark_sum(
             when(
                 col("transaction_type") == "refund",
                 1,
             ).otherwise(0)
         ).alias("refund_transactions"),
-
         spark_sum(
             when(
                 col("is_fraud"),
                 1,
             ).otherwise(0)
         ).alias("fraud_transactions"),
-
         spark_sum(
             when(
                 col("is_late_arriving"),
                 1,
             ).otherwise(0)
         ).alias("late_arriving_transactions"),
-
         spark_round(
             spark_sum(approved_purchase_amount),
             2,
         ).alias("total_purchase_amount"),
-
         spark_round(
             spark_sum(approved_refund_amount),
             2,
         ).alias("total_refund_amount"),
-
         spark_round(
             avg(
                 when(
@@ -179,16 +164,14 @@ def build_daily_kpis(
     )
 
     return (
-        metrics
-        .withColumn(
+        metrics.withColumn(
             "logical_date",
             lit(logical_date).cast("date"),
         )
         .withColumn(
             "net_amount",
             spark_round(
-                col("total_purchase_amount")
-                + col("total_refund_amount"),
+                col("total_purchase_amount") + col("total_refund_amount"),
                 2,
             ),
         )
@@ -197,8 +180,7 @@ def build_daily_kpis(
             spark_round(
                 when(
                     col("total_transactions") > 0,
-                    col("fraud_transactions")
-                    / col("total_transactions"),
+                    col("fraud_transactions") / col("total_transactions"),
                 ).otherwise(0.0),
                 4,
             ),
@@ -208,8 +190,7 @@ def build_daily_kpis(
             spark_round(
                 when(
                     col("total_transactions") > 0,
-                    col("refund_transactions")
-                    / col("total_transactions"),
+                    col("refund_transactions") / col("total_transactions"),
                 ).otherwise(0.0),
                 4,
             ),
@@ -219,8 +200,7 @@ def build_daily_kpis(
             spark_round(
                 when(
                     col("total_transactions") > 0,
-                    col("approved_transactions")
-                    / col("total_transactions"),
+                    col("approved_transactions") / col("total_transactions"),
                 ).otherwise(0.0),
                 4,
             ),
@@ -256,28 +236,24 @@ def build_country_currency_summary(
     ).otherwise(lit(0.0))
 
     return (
-        silver
-        .groupBy(
+        silver.groupBy(
             "transaction_country",
             "currency",
         )
         .agg(
             count("*").alias("transaction_count"),
-
             spark_sum(
                 when(
                     col("status") == "approved",
                     1,
                 ).otherwise(0)
             ).alias("approved_count"),
-
             spark_sum(
                 when(
                     col("is_fraud"),
                     1,
                 ).otherwise(0)
             ).alias("fraud_count"),
-
             spark_round(
                 spark_sum(approved_amount),
                 2,
@@ -316,24 +292,15 @@ def dataframe_to_dict(
 def dataframe_to_list(
     dataframe: DataFrame,
 ) -> list[dict]:
-    return [
-        row.asDict(recursive=True)
-        for row in dataframe.collect()
-    ]
+    return [row.asDict(recursive=True) for row in dataframe.collect()]
 
 
 def serialize_dates(value):
     if isinstance(value, dict):
-        return {
-            key: serialize_dates(item)
-            for key, item in value.items()
-        }
+        return {key: serialize_dates(item) for key, item in value.items()}
 
     if isinstance(value, list):
-        return [
-            serialize_dates(item)
-            for item in value
-        ]
+        return [serialize_dates(item) for item in value]
 
     if hasattr(value, "isoformat"):
         return value.isoformat()
@@ -368,12 +335,8 @@ def write_business_metrics(
 
     payload = {
         "logical_date": logical_date,
-        "daily_kpis": dataframe_to_dict(
-            daily_kpis
-        ),
-        "country_currency_summary": dataframe_to_list(
-            country_currency_summary
-        ),
+        "daily_kpis": dataframe_to_dict(daily_kpis),
+        "country_currency_summary": dataframe_to_list(country_currency_summary),
     }
 
     payload = serialize_dates(payload)
@@ -402,9 +365,7 @@ def main() -> None:
     )
 
     if not Path(input_path).exists():
-        raise FileNotFoundError(
-            f"Silver batch does not exist: {input_path}"
-        )
+        raise FileNotFoundError(f"Silver batch does not exist: {input_path}")
 
     daily_kpis_path = partition_path(
         data_dir=args.data_dir,
@@ -419,10 +380,7 @@ def main() -> None:
     )
 
     spark = (
-        SparkSession.builder
-        .appName(
-            f"build-gold-{args.logical_date}"
-        )
+        SparkSession.builder.appName(f"build-gold-{args.logical_date}")
         .master("local[2]")
         .getOrCreate()
     )
@@ -435,24 +393,14 @@ def main() -> None:
             logical_date=args.logical_date,
         )
 
-        country_currency_summary = (
-            build_country_currency_summary(
-                silver=silver,
-                logical_date=args.logical_date,
-            )
+        country_currency_summary = build_country_currency_summary(
+            silver=silver,
+            logical_date=args.logical_date,
         )
 
-        (
-            daily_kpis.write
-            .mode("overwrite")
-            .parquet(daily_kpis_path)
-        )
+        (daily_kpis.write.mode("overwrite").parquet(daily_kpis_path))
 
-        (
-            country_currency_summary.write
-            .mode("overwrite")
-            .parquet(country_summary_path)
-        )
+        (country_currency_summary.write.mode("overwrite").parquet(country_summary_path))
 
         report_path = write_business_metrics(
             daily_kpis=daily_kpis,

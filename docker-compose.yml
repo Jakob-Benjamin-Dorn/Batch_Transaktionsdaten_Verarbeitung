@@ -90,7 +90,7 @@ services:
     environment:
       AIRFLOW_HOME: /opt/airflow
 
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
 
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/state/airflow.db
@@ -117,6 +117,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./src:/opt/airflow/src:ro
       - ./knowledge_base:/opt/airflow/knowledge_base:ro
+      - ./sql:/opt/airflow/sql:ro
       - ./tests:/opt/airflow/tests:ro
 
       - airflow_data:/opt/airflow/data

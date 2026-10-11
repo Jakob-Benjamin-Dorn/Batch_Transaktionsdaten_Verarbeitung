@@ -1,0 +1,28 @@
+# Ruff-Konfiguration für Linting und Formatierung.
+# Aufruf:  ruff check .   |   ruff format .
+
+target-version = "py312"
+line-length = 88
+
+# Nur Python-Dateien prüfen/formatieren (nicht die Code-Beispiele in READMEs).
+include = ["*.py"]
+
+[lint]
+select = [
+    "E",    # pycodestyle-Fehler
+    "F",    # Pyflakes (ungenutzte Imports/Variablen, undefinierte Namen)
+    "I",    # isort (Import-Reihenfolge)
+    "UP",   # pyupgrade (moderne Python-Syntax)
+    "B",    # flake8-bugbear (typische Fehlerquellen)
+    "SIM",  # flake8-simplify
+    "RUF",  # Ruff-spezifische Regeln
+]
+ignore = [
+    "E501",    # Zeilenlänge übernimmt der Formatter; Prompts/Texte dürfen länger sein
+    "RUF001",  # deutsche Texte und Gedankenstriche sind gewollt
+    "RUF002",
+    "RUF003",
+]
+
+[lint.isort]
+known-first-party = ["src"]

@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from src.common.dates import validate_logical_date
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -29,28 +31,11 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--contract-path",
-        default=(
-            "/opt/airflow/knowledge_base/"
-            "data_contract.json"
-        ),
+        default=("/opt/airflow/knowledge_base/data_contract.json"),
         help="Path to the data contract.",
     )
 
     return parser.parse_args()
-
-
-def validate_logical_date(
-    logical_date: str,
-) -> None:
-    try:
-        datetime.strptime(
-            logical_date,
-            "%Y-%m-%d",
-        )
-    except ValueError as exc:
-        raise ValueError(
-            "--logical-date must use YYYY-MM-DD."
-        ) from exc
 
 
 def report_path(
@@ -76,9 +61,7 @@ def load_json(
     path: Path,
 ) -> dict[str, Any]:
     if not path.is_file():
-        raise FileNotFoundError(
-            f"Required JSON file does not exist: {path}"
-        )
+        raise FileNotFoundError(f"Required JSON file does not exist: {path}")
 
     with path.open(
         encoding="utf-8",
@@ -86,9 +69,7 @@ def load_json(
         value = json.load(file)
 
     if not isinstance(value, dict):
-        raise ValueError(
-            f"Expected a JSON object in {path}"
-        )
+        raise ValueError(f"Expected a JSON object in {path}")
 
     return value
 
@@ -138,21 +119,11 @@ def evaluate_quality_gate(
     )
 
     if not isinstance(gate_config, dict):
-        raise ValueError(
-            "quality_gate must be an object."
-        )
+        raise ValueError("quality_gate must be an object.")
 
-    minimum_validity_rate = float(
-        gate_config[
-            "minimum_validity_rate"
-        ]
-    )
+    minimum_validity_rate = float(gate_config["minimum_validity_rate"])
 
-    maximum_high_failure_rate = float(
-        gate_config[
-            "maximum_high_severity_failure_rate"
-        ]
-    )
+    maximum_high_failure_rate = float(gate_config["maximum_high_severity_failure_rate"])
 
     input_rows = int(
         quality_report.get(
@@ -174,16 +145,12 @@ def evaluate_quality_gate(
     )
 
     if not isinstance(rule_failures, dict):
-        raise ValueError(
-            "rule_failures must be an object."
-        )
+        raise ValueError("rule_failures must be an object.")
 
     failures = []
 
     if input_rows <= 0:
-        failures.append(
-            "The batch contains no input rows."
-        )
+        failures.append("The batch contains no input rows.")
 
     if validity_rate < minimum_validity_rate:
         failures.append(
@@ -193,36 +160,20 @@ def evaluate_quality_gate(
             f"{minimum_validity_rate:.2%}."
         )
 
-    severities = rule_severity_by_id(
-        contract
-    )
+    severities = rule_severity_by_id(contract)
 
     if input_rows > 0:
-        for report_rule_id, failure_count in (
-            rule_failures.items()
-        ):
-            contract_rule_id = (
-                normalize_report_rule_id(
-                    str(report_rule_id)
-                )
-            )
+        for report_rule_id, failure_count in rule_failures.items():
+            contract_rule_id = normalize_report_rule_id(str(report_rule_id))
 
-            severity = severities.get(
-                contract_rule_id
-            )
+            severity = severities.get(contract_rule_id)
 
             if severity != "high":
                 continue
 
-            failure_rate = (
-                int(failure_count)
-                / input_rows
-            )
+            failure_rate = int(failure_count) / input_rows
 
-            if (
-                failure_rate
-                > maximum_high_failure_rate
-            ):
+            if failure_rate > maximum_high_failure_rate:
                 failures.append(
                     f"{report_rule_id} affects "
                     f"{failure_rate:.2%} of input rows, "
@@ -235,9 +186,7 @@ def evaluate_quality_gate(
 
 def main() -> None:
     args = parse_args()
-    validate_logical_date(
-        args.logical_date
-    )
+    validate_logical_date(args.logical_date)
 
     quality_report = load_json(
         report_path(
@@ -246,9 +195,7 @@ def main() -> None:
         )
     )
 
-    contract = load_json(
-        Path(args.contract_path)
-    )
+    contract = load_json(Path(args.contract_path))
 
     failures = evaluate_quality_gate(
         quality_report=quality_report,

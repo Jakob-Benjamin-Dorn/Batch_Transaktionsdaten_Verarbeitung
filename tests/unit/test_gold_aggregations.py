@@ -17,7 +17,6 @@ from src.spark.build_gold import (
     build_daily_kpis,
 )
 
-
 SILVER_TEST_SCHEMA = StructType(
     [
         StructField(
@@ -73,8 +72,7 @@ class TestGoldAggregations(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.spark = (
-            SparkSession.builder
-            .appName("test-gold-aggregations")
+            SparkSession.builder.appName("test-gold-aggregations")
             .master("local[1]")
             .getOrCreate()
         )

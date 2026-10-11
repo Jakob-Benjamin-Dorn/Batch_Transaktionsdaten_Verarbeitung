@@ -29,9 +29,7 @@ class TestQualityGate(unittest.TestCase):
 
     def test_report_rule_id_is_normalized(self):
         self.assertEqual(
-            normalize_report_rule_id(
-                "DQ001_REQUIRED_CUSTOMER_ID"
-            ),
+            normalize_report_rule_id("DQ001_REQUIRED_CUSTOMER_ID"),
             "DQ001",
         )
 
